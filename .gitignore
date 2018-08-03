@@ -1,5 +1,6 @@
 debug.trace
 *~
+*.o
 kernel-rootfs/
 temp/
 container-root/
