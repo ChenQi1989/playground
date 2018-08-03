@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <assert.h>
+#include <dirent.h>
 
 #include "test.h"
 
@@ -22,6 +24,28 @@ static int func_test(int argc, char **argv) {
 
 /* chroot to path and list entries in path */
 static int chroot_and_list(int argc, char **argv) {
+	char *root;
+	int r;
+	struct dirent *dep;
+	DIR *dirp;
+
+	assert(argc == 2);
+
+	root = argv[1];
+	r = chroot(root);
+	if (r < 0) {
+		fprintf(stderr, "chroot to %s failed: %m\n", root);
+		return -r;
+	}
+
+	dirp = opendir("/");
+	if (dirp == NULL) {
+		fprintf(stderr, "opendir on / failed: %m\n");
+		return 1;
+	}
+	while ((dep = readdir(dirp)) != NULL)
+		printf("%s\n", dep->d_name);
+		
 	return 0;
 }
 
