@@ -1,0 +1,6 @@
+debug.trace
+*~
+kernel-rootfs/
+temp/
+container-root/
+chroot_root/
