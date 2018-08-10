@@ -12,4 +12,9 @@ struct func_tab {
 	fn_t fp;
 };
 
+#ifdef MEM_DEBUG
+#define malloc mymalloc
+#define free myfree
+#endif
+
 #endif

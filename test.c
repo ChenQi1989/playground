@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <dirent.h>
+#include <stdlib.h>
 
 #include "test.h"
 
@@ -49,10 +50,51 @@ static int chroot_and_list(int argc, char **argv) {
 	return 0;
 }
 
+#ifdef MEM_DEBUG
+/* hack function for malloc and free */
+void *mymalloc(unsigned int bytes) {
+#undef malloc
+#undef free
+	printf("mymalloc\n");
+	return malloc(bytes);
+#define malloc mymalloc
+#define free myfree
+}
+
+void myfree(void *mp) {
+#undef malloc
+#undef free
+	printf("myfree\n");
+	free(mp);
+#define malloc mymalloc
+#define free myfree
+}
+#endif
+
+/* malloc and free */
+static int malloc_and_free(int argc, char **argv) {
+	assert(argc == 3);
+	int bytes = atoi(argv[1]);
+	int times = atoi(argv[2]);
+	printf("test malloc %d bytes and free for %d times\n", bytes, times);
+	for (int i=0; i < times; i++) {
+		char *mp = (char *)malloc(bytes);
+		if (mp == NULL) {
+			fprintf(stderr, "malloc failure: %m\n");
+			return 1;
+		} else {
+			free(mp);
+		}
+	}
+
+	return 0;
+}
+
 /* define the function table */
 static struct func_tab functab[NFUNCS] = {
 	{"func_test", func_test},
 	{"chroot_and_list", chroot_and_list},
+	{"malloc_and_free", malloc_and_free},
 	{NULL, NULL},
 };
 
