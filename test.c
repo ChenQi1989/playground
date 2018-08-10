@@ -52,23 +52,27 @@ static int chroot_and_list(int argc, char **argv) {
 
 #ifdef MEM_DEBUG
 /* hack function for malloc and free */
-void *mymalloc(unsigned int bytes) {
+void *_mymalloc(unsigned int bytes, const char *file, const char *func, int line) {
 #undef malloc
 #undef free
-	printf("mymalloc\n");
+	printf("mymalloc, file = %s, func = %s, lineno = %d\n", file, func, line);
 	return malloc(bytes);
 #define malloc mymalloc
 #define free myfree
 }
 
-void myfree(void *mp) {
+#define mymalloc(bytes) _mymalloc(bytes, __FILE__, __func__, __LINE__)
+
+void _myfree(void *mp, const char *file, const char *func, int line) {
 #undef malloc
 #undef free
-	printf("myfree\n");
+	printf("myfree, file = %s, func = %s, lineno = %d\n", file, func, line);
 	free(mp);
 #define malloc mymalloc
 #define free myfree
 }
+
+#define myfree(bytes) _myfree(mp, __FILE__, __func__, __LINE__)
 #endif
 
 /* malloc and free */
