@@ -130,7 +130,6 @@ static fn_t get_func(const char *name) {
 }
 
 int main(int argc, char *argv[]) {
-	int ret;
 	char *funcname;
 	fn_t fp;
 
