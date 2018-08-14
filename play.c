@@ -8,9 +8,9 @@
 #include <dirent.h>
 #include <stdlib.h>
 
-#include "test.h"
+#include "play.h"
 
-#define PROG_NAME "test"
+#define PROG_NAME "play"
 
 static int func_test(int argc, char **argv) {
 	char **arg;

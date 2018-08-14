@@ -5,4 +5,4 @@ kernel-rootfs/
 temp/
 container-root/
 chroot_root/
-test
+play

@@ -1,8 +1,8 @@
-TARGETS = test
+TARGETS = play
 ALL: $(TARGETS)
 
-test: test.c test.h
-	$(CC) $(CFLAGS) -o test test.c
+play: play.c play.h
+	$(CC) $(CFLAGS) -o play play.c
 
 clean:
 	rm -f *~
