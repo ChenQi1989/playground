@@ -9,6 +9,7 @@
 #include <dirent.h>
 #include <stdlib.h>
 #include <syslog.h>
+#include <signal.h>
 
 #include "play.h"
 
@@ -142,42 +143,7 @@ static int tinyinit(int argc, char **argv) {
 	printf("*        tiny   init        *\n");
 	printf("*****************************\n");
 
-	pid = fork();
-	if (pid < 0) {
-		fprintf(stderr, "Forking failed: %m\n");
-		return pid;
-	} else if (pid > 0) {
-		/* in parent process  */
-		ret = daemon(0, 0);
-		if (ret < 0) {
-			fprintf(stderr, "daemon() failed: %m\n");
-			return ret;
-		}
-		for(;;) {
-			/* run forever  */
-			sleep(100);
-		}
-	} else {
-		/* pid == 0, in child process  */
-		printf("I'm the child running here ... \n");
-		if (argc > 1) {
-			printf("argc > 1; execve %s\n", argv[1]);
-			ret = execve(argv[1], argv+2, NULL);
-			if (ret < 0) {
-				fprintf(stderr, "execve() failed: %m\n");
-				return ret;
-			}
-		} else {
-			/* try to execute sh -l  */
-			printf("argc == 1, execute sh -l\n");
-			ret = execl("/bin/sh", "-l", NULL);
-			if (ret < 0)
-				ret = execl("/sbin/busybox", "sh", "-l", NULL);
-			if (ret < 0) {
-				fprintf(stderr, "execute sh -l failed: %m\n");
-			}
-		}
-	}
+	execl("/sbin/busybox", "sh", NULL);
 
 	fprintf(stderr, "WE SHOULD NEVER GET HERE!\n");
 	return 0;
