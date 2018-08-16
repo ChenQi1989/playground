@@ -128,7 +128,7 @@ static int simple_daemon(int argc, char **argv) {
 	return 0;
 }
 
-
+extern char **environ;
 /*
  * simple tinyinit
  *
@@ -143,8 +143,15 @@ static int tinyinit(int argc, char **argv) {
 	printf("*        tiny   init        *\n");
 	printf("*****************************\n");
 
-	execl("/sbin/busybox", "sh", NULL);
+	/* execute shell  */
+	char *shell = getenv("SHELL");
+	setenv("PS1", "[tinyinit] $ ", 1);
+	execle(shell, NULL, environ);
 
+	/* default to execute busybox sh  */
+	execl("/sbin/busybox", "sh", NULL);
+	execl("/bin/busybox", "sh", NULL);
+	
 	fprintf(stderr, "WE SHOULD NEVER GET HERE!\n");
 	return 0;
 }
