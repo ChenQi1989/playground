@@ -1,5 +1,6 @@
 /* test <function> <para1> <param2> ... */
 
+#include <sys/types.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
@@ -7,6 +8,7 @@
 #include <assert.h>
 #include <dirent.h>
 #include <stdlib.h>
+#include <syslog.h>
 
 #include "play.h"
 
@@ -46,7 +48,7 @@ static int chroot_and_list(int argc, char **argv) {
 	}
 	while ((dep = readdir(dirp)) != NULL)
 		printf("%s\n", dep->d_name);
-		
+
 	return 0;
 }
 
@@ -94,11 +96,100 @@ static int malloc_and_free(int argc, char **argv) {
 	return 0;
 }
 
+/*
+ * simple daemon
+ * daemon that monitor argv[1] and sync its contents with argv[2]
+ */
+static int simple_daemon(int argc, char **argv) {
+	pid_t pid;
+
+	pid = fork();
+	if (pid < 0) {
+		fprintf(stderr, "Fork failed: %m\n");
+		exit(1);
+	} else if (pid > 0) {
+		printf("parent process exit\n");
+		exit(0);
+	} else {
+		int i, status;
+		status = daemon(0, 0);
+		if (status < 0) {
+			fprintf(stderr, "daemon() failed: %m\n");
+			exit(1);
+		}
+		i = 0;
+		for (;;) {
+			syslog(LOG_INFO, "simple_daemon running: i = %d\n", i++);
+			sleep(10);
+		}
+	}
+
+	return 0;
+}
+
+
+/*
+ * simple tinyinit
+ *
+ * argv specifies the prog to execute
+ *      if not specified, try to sh -l
+ */
+static int tinyinit(int argc, char **argv) {
+	pid_t pid;
+	int ret;
+
+	printf("*****************************\n");
+	printf("*        tiny   init        *\n");
+	printf("*****************************\n");
+
+	pid = fork();
+	if (pid < 0) {
+		fprintf(stderr, "Forking failed: %m\n");
+		return pid;
+	} else if (pid > 0) {
+		/* in parent process  */
+		ret = daemon(0, 0);
+		if (ret < 0) {
+			fprintf(stderr, "daemon() failed: %m\n");
+			return ret;
+		}
+		for(;;) {
+			/* run forever  */
+			sleep(100);
+		}
+	} else {
+		/* pid == 0, in child process  */
+		printf("I'm the child running here ... \n");
+		if (argc > 1) {
+			printf("argc > 1; execve %s\n", argv[1]);
+			ret = execve(argv[1], argv+2, NULL);
+			if (ret < 0) {
+				fprintf(stderr, "execve() failed: %m\n");
+				return ret;
+			}
+		} else {
+			/* try to execute sh -l  */
+			printf("argc == 1, execute sh -l\n");
+			ret = execl("/bin/sh", "-l", NULL);
+			if (ret < 0)
+				ret = execl("/sbin/busybox", "sh", "-l", NULL);
+			if (ret < 0) {
+				fprintf(stderr, "execute sh -l failed: %m\n");
+			}
+		}
+	}
+
+	fprintf(stderr, "WE SHOULD NEVER GET HERE!\n");
+	return 0;
+}
+
 /* define the function table */
 static struct func_tab functab[NFUNCS] = {
 	{"func_test", func_test},
 	{"chroot_and_list", chroot_and_list},
 	{"malloc_and_free", malloc_and_free},
+	{"simple_daemon", simple_daemon},
+	{"tinyinit", tinyinit},
 	{NULL, NULL},
 };
 
@@ -146,6 +237,6 @@ int main(int argc, char *argv[]) {
 	} else {
 		return fp(argc-1, argv+1);
 	}
-	
+
 	return 0;
 }
