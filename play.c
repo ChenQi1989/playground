@@ -15,6 +15,25 @@
 
 #define PROG_NAME "play"
 
+/*
+ **************************************************************
+ *    HELP FUNCTIONS                                          *
+ **************************************************************
+ */
+
+static void error_and_exit(const char *msg) {
+	fprintf(stderr, "%s: %m\n", msg);
+	exit(1);
+}
+
+
+
+/*
+ **************************************************************
+ *    MAIN FUNCTIONS                                          *
+ **************************************************************
+ */
+
 static int func_test(int argc, char **argv) {
 	char **arg;
 	printf("func_test:\n");
@@ -97,6 +116,20 @@ static int malloc_and_free(int argc, char **argv) {
 	return 0;
 }
 
+/* create a zombie process */
+static int create_zombie_process(int argc, char **argv) {
+	pid_t pid;
+
+	if ((pid = fork()) < 0)
+		error_and_exit("Fork failed");
+	else if (pid > 0)
+		exit(0);
+	else {
+		sleep(1);
+	}
+	return 0;
+}
+
 /*
  * simple daemon
  * daemon that monitor argv[1] and sync its contents with argv[2]
@@ -149,9 +182,9 @@ static int tinyinit(int argc, char **argv) {
 	execle(shell, NULL, environ);
 
 	/* default to execute busybox sh  */
-	execl("/sbin/busybox", "sh", NULL);
-	execl("/bin/busybox", "sh", NULL);
-	
+	execl("/sbin/busybox", "sh", "-l", NULL);
+	execl("/bin/busybox", "sh", "-l", NULL);
+
 	fprintf(stderr, "WE SHOULD NEVER GET HERE!\n");
 	return 0;
 }
@@ -162,6 +195,7 @@ static struct func_tab functab[NFUNCS] = {
 	{"chroot_and_list", chroot_and_list},
 	{"malloc_and_free", malloc_and_free},
 	{"simple_daemon", simple_daemon},
+	{"create_zombie", create_zombie_process},
 	{"tinyinit", tinyinit},
 	{NULL, NULL},
 };
