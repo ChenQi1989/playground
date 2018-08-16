@@ -1,4 +1,4 @@
-debug.trace
+debug.strace
 *~
 *.o
 kernel-rootfs/
