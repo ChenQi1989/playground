@@ -132,22 +132,12 @@ static int create_zombie_process(int argc, char **argv) {
  * daemon that monitor argv[1] and sync its contents with argv[2]
  */
 static int simple_daemon(int argc, char **argv) {
-	pid_t pid;
-
-	pid = fork();
-	if (pid < 0) {
-		error_and_exit("Fork failed");
-	} else if (pid > 0) {
-		printf("parent process exit\n");
-		exit(0);
-	}
-
-	/* child process part */
 	int i, status;
 	status = daemon(0, 0);
 	if (status < 0)
 		error_and_exit("daemon() failed");
 
+	/* child process part */
 	i = 0;
 	for (;;) {
 		syslog(LOG_INFO, "simple_daemon running: i = %d\n", i++);
