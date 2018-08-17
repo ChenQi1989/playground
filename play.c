@@ -62,10 +62,9 @@ static int chroot_and_list(int argc, char **argv) {
 	}
 
 	dirp = opendir("/");
-	if (dirp == NULL) {
-		fprintf(stderr, "opendir on / failed: %m\n");
-		return 1;
-	}
+	if (dirp == NULL)
+		error_and_exit("opendir on / failed");
+
 	while ((dep = readdir(dirp)) != NULL)
 		printf("%s\n", dep->d_name);
 
@@ -105,12 +104,10 @@ static int malloc_and_free(int argc, char **argv) {
 	printf("test malloc %d bytes and free for %d times\n", bytes, times);
 	for (int i=0; i < times; i++) {
 		char *mp = (char *)malloc(bytes);
-		if (mp == NULL) {
-			fprintf(stderr, "malloc failure: %m\n");
-			return 1;
-		} else {
+		if (mp == NULL)
+			error_and_exit("malloc failure");
+		else
 			free(mp);
-		}
 	}
 
 	return 0;
@@ -139,23 +136,22 @@ static int simple_daemon(int argc, char **argv) {
 
 	pid = fork();
 	if (pid < 0) {
-		fprintf(stderr, "Fork failed: %m\n");
-		exit(1);
+		error_and_exit("Fork failed");
 	} else if (pid > 0) {
 		printf("parent process exit\n");
 		exit(0);
-	} else {
-		int i, status;
-		status = daemon(0, 0);
-		if (status < 0) {
-			fprintf(stderr, "daemon() failed: %m\n");
-			exit(1);
-		}
-		i = 0;
-		for (;;) {
-			syslog(LOG_INFO, "simple_daemon running: i = %d\n", i++);
-			sleep(10);
-		}
+	}
+
+	/* child process part */
+	int i, status;
+	status = daemon(0, 0);
+	if (status < 0)
+		error_and_exit("daemon() failed");
+
+	i = 0;
+	for (;;) {
+		syslog(LOG_INFO, "simple_daemon running: i = %d\n", i++);
+		sleep(10);
 	}
 
 	return 0;
@@ -239,8 +235,7 @@ int main(int argc, char *argv[]) {
 	funcname = argv[1];
 	fp = get_func(funcname);
 	if (fp == NULL) {
-		fprintf(stderr, "no such function\n");
-		return 1;
+		error_and_exit("no such function");
 	} else {
 		return fp(argc-1, argv+1);
 	}
