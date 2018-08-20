@@ -128,7 +128,7 @@ static int create_zombie_process(int argc, char **argv) {
 }
 
 /*
- * simple daemon
+ * simple daemon using daemon call
  * daemon that monitor argv[1] and sync its contents with argv[2]
  */
 static int simple_daemon(int argc, char **argv) {
@@ -145,6 +145,108 @@ static int simple_daemon(int argc, char **argv) {
 	}
 
 	return 0;
+}
+
+/*
+ * daemon that do all the tedious work itself
+ *   - only allow one instance
+ *   - catch SIGTERM and SIGABRT
+ */
+static void sighandler_complex_daemon(int sig) {
+	/* catch SIGTERM and SIGABRT and do logging  */	
+	switch(sig) {
+		case SIGTERM:
+		case SIGABRT:
+			syslog(LOG_INFO, "%s caught\n", sig == SIGTERM ? "SIGTERM" : "SIGABRT"	);
+			break;
+		default:
+			syslog(LOG_ERROR, "unexpected signal %d caught!\n");
+			exit(1);
+	}
+}
+
+static int complex_daemon(int argc, char **argv) {
+	int fd;
+	int i;
+	char *s;
+
+	switch(fork()) {
+		case -1:
+			error_and_exit("fork() failed: %m\n");
+		case 0:
+			break;
+		default:
+			exit(0);	
+	}
+	
+	/* obtain a new session */
+	if (setsid() < 0)
+		error_and_exit("setsid() failed: %m\n");
+		
+	/* change working directory  */
+	if (chdir("/") < 0)
+		error_and_exit("chdir to / failed: %m\n");
+
+	/* close all descriptors  */
+	for (int i=0; i<getdtablesize(); i++)
+		close(i);
+	
+	/* handle standard I/O  */
+	fd = open("/dev/null", R_RDWR);
+	if (fd < 0)
+		error_and_exit("open /dev/null failed: %m\n");
+	dup2(fd, 0);
+	dup2(fd, 1);
+	dup2(fd, 2);
+
+	/* set file permission  */
+	umask(0);
+
+	/* ensure one instance  */
+	fd = open("/tmp/complex_daemon.pid", O_RDWR|O_CREAT, 0640);
+	if (fd < 0)
+		error_and_exit("open PID file failed: %m\n");
+	if (lockf(fd, F_TLOCK, 0) < 0)
+		error_and_exit("service already running: %m\n");
+	sprintf(s, "%d\n", getpid());
+	write(fd, s, strlen(s));
+
+	/* handle signals  */
+	signal(SIGCHLD, SIG_IGN);	/* ingore child termination  */
+	signal(SIGTERM, sighandler_complex_daemon);
+	signal(SIGABRT, sighandler_complex_daemon);
+	
+	/* service logic below  */
+	for (i=0;;i++) {
+		syslog(LOG_INFO, "complex_daemon: %d\n", i);
+		sleep(10);
+	}
+}
+
+
+/*
+ * get information about a process
+ */
+static int get_proc_info(int argc, char **argv) {
+	
+}
+
+/*
+ * use inotify to monitor the creation/removal of a file
+ * and sync it with the other
+ */
+static int _monitor_and_sync(const char *srcf, const char *dstf) {
+	return 0;
+} 
+
+static int monitor_and_sync(int argc, char **argv) {
+	char *srcf, *dstf;	
+
+	assert(argc == 3);
+	srcf = argv[1];
+	dstf = argv[2];
+	
+	return _monitor_and_sync(srcf, dstf);
 }
 
 extern char **environ;
@@ -180,8 +282,9 @@ static struct func_tab functab[NFUNCS] = {
 	{"func_test", func_test},
 	{"chroot_and_list", chroot_and_list},
 	{"malloc_and_free", malloc_and_free},
-	{"simple_daemon", simple_daemon},
 	{"create_zombie", create_zombie_process},
+	{"simple_daemon", simple_daemon},
+	{"complex_daemon", complex_daemon},
 	{"tinyinit", tinyinit},
 	{NULL, NULL},
 };
