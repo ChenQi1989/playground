@@ -17,14 +17,16 @@
 
 /*
  **************************************************************
- *    HELP FUNCTIONS                                          *
+ *    HELP FUNCTIONS AND MACROS                               *
  **************************************************************
  */
 
-static void error_and_exit(const char *msg) {
-	fprintf(stderr, "%s: %m\n", msg);
-	exit(1);
-}
+#define error_and_exit(...)				\
+do							\
+{							\
+	fprintf(stderr, __VA_ARGS__);			\
+	exit(1);					\
+} while (0)
 
 
 
@@ -56,14 +58,12 @@ static int chroot_and_list(int argc, char **argv) {
 
 	root = argv[1];
 	r = chroot(root);
-	if (r < 0) {
-		fprintf(stderr, "chroot to %s failed: %m\n", root);
-		return -r;
-	}
+	if (r < 0)
+		error_and_exit("chroot to %s failed: %m\n", root);
 
 	dirp = opendir("/");
 	if (dirp == NULL)
-		error_and_exit("opendir on / failed");
+		error_and_exit("opendir on / failed\n");
 
 	while ((dep = readdir(dirp)) != NULL)
 		printf("%s\n", dep->d_name);
@@ -105,7 +105,7 @@ static int malloc_and_free(int argc, char **argv) {
 	for (int i=0; i < times; i++) {
 		char *mp = (char *)malloc(bytes);
 		if (mp == NULL)
-			error_and_exit("malloc failure");
+			error_and_exit("malloc failure: %m\n");
 		else
 			free(mp);
 	}
@@ -118,7 +118,7 @@ static int create_zombie_process(int argc, char **argv) {
 	pid_t pid;
 
 	if ((pid = fork()) < 0)
-		error_and_exit("Fork failed");
+		error_and_exit("Fork failed: %m\n");
 	else if (pid > 0)
 		exit(0);
 	else {
@@ -135,7 +135,7 @@ static int simple_daemon(int argc, char **argv) {
 	int i, status;
 	status = daemon(0, 0);
 	if (status < 0)
-		error_and_exit("daemon() failed");
+		error_and_exit("daemon() failed: %m\n");
 
 	/* child process part */
 	i = 0;
@@ -225,7 +225,7 @@ int main(int argc, char *argv[]) {
 	funcname = argv[1];
 	fp = get_func(funcname);
 	if (fp == NULL) {
-		error_and_exit("no such function");
+		error_and_exit("no such function\n");
 	} else {
 		return fp(argc-1, argv+1);
 	}
