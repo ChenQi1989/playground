@@ -1,8 +1,10 @@
 /* test <function> <para1> <param2> ... */
 
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <fcntl.h>
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
@@ -28,6 +30,12 @@ do							\
 	exit(1);					\
 } while (0)
 
+#define log_error_and_exit(...)				\
+do							\
+{							\
+	syslog(LOG_ERR, __VA_ARGS__);			\
+	exit(1);					\
+} while (0)
 
 
 /*
@@ -160,15 +168,15 @@ static void sighandler_complex_daemon(int sig) {
 			syslog(LOG_INFO, "%s caught\n", sig == SIGTERM ? "SIGTERM" : "SIGABRT"	);
 			break;
 		default:
-			syslog(LOG_ERROR, "unexpected signal %d caught!\n");
+			syslog(LOG_ERR, "unexpected signal %d caught!\n", sig);
 			exit(1);
 	}
 }
 
 static int complex_daemon(int argc, char **argv) {
-	int fd;
+	int fd, lfd;
 	int i;
-	char *s;
+	char s[16];
 
 	switch(fork()) {
 		case -1:
@@ -178,38 +186,41 @@ static int complex_daemon(int argc, char **argv) {
 		default:
 			exit(0);	
 	}
-	
+
 	/* obtain a new session */
 	if (setsid() < 0)
 		error_and_exit("setsid() failed: %m\n");
-		
+
 	/* change working directory  */
 	if (chdir("/") < 0)
 		error_and_exit("chdir to / failed: %m\n");
 
-	/* close all descriptors  */
-	for (int i=0; i<getdtablesize(); i++)
+	/* close all other file descriptors  */
+	for (int i=getdtablesize(); i>0; i--)
 		close(i);
-	
+
 	/* handle standard I/O  */
-	fd = open("/dev/null", R_RDWR);
+	fd = open("/dev/null", O_RDWR);
 	if (fd < 0)
-		error_and_exit("open /dev/null failed: %m\n");
+		log_error_and_exit("open /dev/null faild: %m\n");
 	dup2(fd, 0);
 	dup2(fd, 1);
 	dup2(fd, 2);
+	if (fd > 2)
+		close(fd);
+
+	/* ensure one instance  */
+	lfd = open("/tmp/complex_daemon.pid", O_RDWR|O_CREAT, 0640);
+	if (lfd < 0)
+		log_error_and_exit("open PID file failed: %m\n");
+	if (lockf(lfd, F_TLOCK, 0) < 0)
+		log_error_and_exit("already running, lockf failed: %m\n");
+	sprintf(s, "%d\n", getpid());
+	write(lfd, s, strlen(s));
+	fsync(lfd);
 
 	/* set file permission  */
 	umask(0);
-
-	/* ensure one instance  */
-	fd = open("/tmp/complex_daemon.pid", O_RDWR|O_CREAT, 0640);
-	if (fd < 0)
-		error_and_exit("open PID file failed: %m\n");
-	if (lockf(fd, F_TLOCK, 0) < 0)
-		error_and_exit("service already running: %m\n");
-	sprintf(s, "%d\n", getpid());
-	write(fd, s, strlen(s));
 
 	/* handle signals  */
 	signal(SIGCHLD, SIG_IGN);	/* ingore child termination  */
