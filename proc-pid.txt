@@ -18,6 +18,20 @@ cmdline
   read  on  this  file will return 0 characters.  The command-line arguments appear in this file as a set of strings separated by null bytes ('\0'), with a further null
   byte after the last string.
 
+  When the process is started by the kernel, cmdline is NUL-separated, and the kernel code simply copies the range of memory where argv[] was at process startup into the
+  output buffer when you read /proc/PID/cmdline.
+
+  e.g.
+  I once met a problem where /proc/PID/cmdline contains incorrect value. It turns out that I was using an uninitialzed char *s in program.
+  The codes are like:
+  {
+	char *s;
+	...
+	sprintf(s, "%d\n", getpid());
+	...
+  }
+  And it's incorrectly writing to memory that should be used by argv.
+  To fix the problem, use char s[16] instead of char *s.
 
 comm
 coredump_filter
