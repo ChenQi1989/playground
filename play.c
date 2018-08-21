@@ -293,9 +293,6 @@ extern char **environ;
  *      if not specified, try to sh -l
  */
 static int tinyinit(int argc, char **argv) {
-	pid_t pid;
-	int ret;
-
 	printf("*****************************\n");
 	printf("*        tiny   init        *\n");
 	printf("*****************************\n");
@@ -303,7 +300,7 @@ static int tinyinit(int argc, char **argv) {
 	/* execute shell  */
 	char *shell = getenv("SHELL");
 	setenv("PS1", "[tinyinit] $ ", 1);
-	execle(shell, NULL, environ);
+	execle(shell, shell, NULL, environ);
 
 	/* default to execute busybox sh  */
 	execl("/sbin/busybox", "sh", "-l", NULL);
@@ -322,6 +319,7 @@ static struct func_tab functab[NFUNCS] = {
 	{"simple_daemon", simple_daemon},
 	{"complex_daemon", complex_daemon},
 	{"show_process_info", show_proc_info},
+	{"monitor_and_sync", monitor_and_sync},
 	{"tinyinit", tinyinit},
 	{NULL, NULL},
 };
