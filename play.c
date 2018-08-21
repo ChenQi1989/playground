@@ -161,7 +161,7 @@ static int simple_daemon(int argc, char **argv) {
  *   - catch SIGTERM and SIGABRT
  */
 static void sighandler_complex_daemon(int sig) {
-	/* catch SIGTERM and SIGABRT and do logging  */	
+	/* catch SIGTERM and SIGABRT and do logging  */
 	switch(sig) {
 		case SIGTERM:
 		case SIGABRT:
@@ -184,7 +184,7 @@ static int complex_daemon(int argc, char **argv) {
 		case 0:
 			break;
 		default:
-			exit(0);	
+			exit(0);
 	}
 
 	/* obtain a new session */
@@ -226,7 +226,7 @@ static int complex_daemon(int argc, char **argv) {
 	signal(SIGCHLD, SIG_IGN);	/* ingore child termination  */
 	signal(SIGTERM, sighandler_complex_daemon);
 	signal(SIGABRT, sighandler_complex_daemon);
-	
+
 	/* service logic below  */
 	for (i=0;;i++) {
 		syslog(LOG_INFO, "complex_daemon: %d\n", i);
@@ -237,9 +237,34 @@ static int complex_daemon(int argc, char **argv) {
 
 /*
  * get information about a process
+ * output to stdout or file specified by argv[1]
  */
-static int get_proc_info(int argc, char **argv) {
-	
+static int show_proc_info(int argc, char **argv) {
+	pid_t p;
+	FILE *f;
+
+	if (argc == 1)
+		f = stdout;
+	else
+		if ((f = fopen(argv[1], "w")) == NULL)
+			error_and_exit("fopen %s failed: %m\n", argv[1]);
+
+	/* IDs  */
+	p = getpid();
+	if (p < 0)
+		error_and_exit("getpid failed: %m\n");
+	fprintf(f, "               pid : %d\n", p);
+
+	p = getppid();
+	if (p < 0)
+		error_and_exit("getppid failed: %m\n");
+	fprintf(f, "              ppid : %d\n", p);
+
+	p = getsid(0);
+	if (p < 0)
+		error_and_exit("getsid failed: %m\n");
+	fprintf(f, "               sid : %d\n", p);
+	return 0;
 }
 
 /*
@@ -248,15 +273,15 @@ static int get_proc_info(int argc, char **argv) {
  */
 static int _monitor_and_sync(const char *srcf, const char *dstf) {
 	return 0;
-} 
+}
 
 static int monitor_and_sync(int argc, char **argv) {
-	char *srcf, *dstf;	
+	char *srcf, *dstf;
 
 	assert(argc == 3);
 	srcf = argv[1];
 	dstf = argv[2];
-	
+
 	return _monitor_and_sync(srcf, dstf);
 }
 
@@ -296,6 +321,7 @@ static struct func_tab functab[NFUNCS] = {
 	{"create_zombie", create_zombie_process},
 	{"simple_daemon", simple_daemon},
 	{"complex_daemon", complex_daemon},
+	{"show_process_info", show_proc_info},
 	{"tinyinit", tinyinit},
 	{NULL, NULL},
 };
