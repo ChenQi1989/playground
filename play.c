@@ -245,8 +245,10 @@ static int show_proc_info(int argc, char **argv) {
 	pid_t p;
 	FILE *f;	/* file for output stream  */
 	FILE *ftemp;
-	char entry[PATH_MAX];
+	char entry[PATH_MAX];	/* hold entry in /proc/pid/xxx  */
+	char buf[PATH_MAX];
 	char c;
+	int len;
 
 	if (argc == 1)
 		f = stdout;
@@ -314,6 +316,42 @@ static int show_proc_info(int argc, char **argv) {
 		error_and_exit("something failed when reading %s: %m\n", entry);
 	fclose(ftemp);
 
+	/* cwd  */
+	p = getpid();
+	sprintf(entry, "/proc/%d/cwd", p);
+	len = readlink(entry, buf, PATH_MAX-1);
+	if (len > 0)
+		buf[len] = 0;
+	else
+		error_and_exit("readlink %s failed: %m\n", entry);
+	fprintf(f, "               cwd : %s\n", buf);
+	
+	/* _initial_ environment  */
+	sprintf(entry, "/proc/%d/environ", p);
+	ftemp = fopen(entry, "r");
+	if (ftemp == NULL)
+		error_and_exit("open %s failed: %m\n", entry);
+	fprintf(f, "      init environ : [START]\n");
+	while (fread(&c, 1, 1, ftemp)) {
+		if (c == '\0')
+			fprintf(f, "\n");
+		if (!fwrite(&c, 1, 1, f))
+			error_and_exit("fwrite (c = %c) failed: %m\n", c);
+	}
+	fprintf(f, "      init environ : [END]\n");
+	if (!feof(ftemp))
+		error_and_exit("something failed when reading %s: %m\n", entry);
+	fclose(ftemp);
+
+	/* exe  */
+	sprintf(entry, "/proc/%d/cwd", p);
+	len = readlink(entry, buf, PATH_MAX-1);
+	if (len > 0)
+		buf[len] = 0;
+	else
+		error_and_exit("readlink %s failed: %m\n", entry);
+	fprintf(f, "               exe : %s\n", buf);
+	
 
 	return 0;	
 }
