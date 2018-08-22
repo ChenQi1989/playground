@@ -12,6 +12,8 @@
 #include <stdlib.h>
 #include <syslog.h>
 #include <signal.h>
+#include <sys/syscall.h>
+#include <linux/limits.h>
 
 #include "play.h"
 
@@ -241,7 +243,10 @@ static int complex_daemon(int argc, char **argv) {
  */
 static int show_proc_info(int argc, char **argv) {
 	pid_t p;
-	FILE *f;
+	FILE *f;	/* file for output stream  */
+	FILE *ftemp;
+	char entry[PATH_MAX];
+	char c;
 
 	if (argc == 1)
 		f = stdout;
@@ -249,22 +254,68 @@ static int show_proc_info(int argc, char **argv) {
 		if ((f = fopen(argv[1], "w")) == NULL)
 			error_and_exit("fopen %s failed: %m\n", argv[1]);
 
-	/* IDs  */
+	/* IDs: pid, tid, ppid, pgid, sid  */
 	p = getpid();
 	if (p < 0)
 		error_and_exit("getpid failed: %m\n");
 	fprintf(f, "               pid : %d\n", p);
+
+	p = syscall(SYS_gettid);
+	if (p < 0)
+		error_and_exit("gettid failed: %m\n");
+	fprintf(f, "               tid : %d\n", p);
 
 	p = getppid();
 	if (p < 0)
 		error_and_exit("getppid failed: %m\n");
 	fprintf(f, "              ppid : %d\n", p);
 
+	p = getpgid(0);
+	if (p < 0)
+		error_and_exit("getpgid failed: %m\n");
+	fprintf(f, "              pgid : %d\n", p);
+
 	p = getsid(0);
 	if (p < 0)
 		error_and_exit("getsid failed: %m\n");
 	fprintf(f, "               sid : %d\n", p);
-	return 0;
+	
+	/* comm and cmdline  */
+	/* we could use prctl as an alternative  */
+	sprintf(entry, "/proc/%d/task/%ld/comm", getpid(), syscall(SYS_gettid));
+	ftemp = fopen(entry, "r");
+	if (ftemp == NULL)
+		error_and_exit("open %s failed: %m\n", entry);
+	fprintf(f, "              comm : ");
+	while (fread(&c, 1, 1, ftemp)) {
+		if (c == '\0')
+			c = ' ';
+		if (!fwrite(&c, 1, 1, f))
+			error_and_exit("fwrite (c = %c) failed: %m\n", c);
+	}
+	if (!feof(ftemp))
+		error_and_exit("something failed when reading %s: %m\n", entry);
+	fclose(ftemp);
+
+	/* almost dumplicate with the above, should convert to a function  */
+	sprintf(entry, "/proc/%d/cmdline", getpid());
+	ftemp = fopen(entry, "r");
+	if (ftemp == NULL)
+		error_and_exit("open %s failed: %m\n", entry);
+	fprintf(f, "           cmdline : ");
+	while (fread(&c, 1, 1, ftemp)) {
+		if (c == '\0')
+			c = ' ';
+		if (!fwrite(&c, 1, 1, f))
+			error_and_exit("fwrite (c = %c) failed: %m\n", c);
+	}
+	fprintf(f, "\n");
+	if (!feof(ftemp))
+		error_and_exit("something failed when reading %s: %m\n", entry);
+	fclose(ftemp);
+
+
+	return 0;	
 }
 
 /*
