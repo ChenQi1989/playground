@@ -1,15 +1,125 @@
 What does /proc/PID/ have?
 ==========================
 
+/proc/[pid]
+
+  There is a numerical subdirectory for each running process; the subdirectory is named by the process ID.
+
+  Each  /proc/[pid] subdirectory contains the pseudo-files and directories described below.  These files are normally owned by the effective user and effective group ID
+  of the process.  However, as a security measure, the ownership is made root:root if the process's "dumpable" attribute is set to a value other than 1.  This attribute
+  may change for the following reasons:
+
+  *  The attribute was explicitly set via the prctl(2) PR_SET_DUMPABLE operation.
+
+  *  The attribute was reset to the value in the file /proc/sys/fs/suid_dumpable (described below), for the reasons described in prctl(2).
+
+  Resetting the "dumpable" attribute to 1 reverts the ownership of the /proc/[pid]/* files to the process's real UID and real GID.
+
 
 attr/
 -----
 
+  The  files  in  this  directory  provide an API for security modules.  The contents of this directory are files that can be read and written in order to set security-
+  related attributes.  This directory was added to support SELinux, but the intention was that the API be general enough to support other  security  modules.   For  the
+  purpose of explanation, examples of how SELinux uses these files are provided below.
+
+  This directory is present only if the kernel was configured with CONFIG_SECURITY.
+
 
 autogroup
+---------
+
+  Process's Autogroup (Task Group) Membership
+
+  Since  Linux 2.6.38, the kernel provides a feature known as autogrouping to improve interactive desktop performance in the face of multiprocess, CPU-intensive workloads such
+  as building the Linux kernel with large numbers of parallel build processes (i.e., the make(1) -j flag).
+
+  This feature operates in conjunction with the CFS scheduler and requires a kernel that is configured with CONFIG_SCHED_AUTOGROUP.  On  a  running  system,  this  feature  is
+  enabled  or disabled via the file /proc/sys/kernel/sched_autogroup_enabled; a value of 0 disables the feature, while a value of 1 enables it.  The default value in this file
+  is 1, unless the kernel was booted with the noautogroup parameter.
+
+  A new autogroup is created when a new session is created via setsid(2); this happens, for example, when a new terminal window is started.  A new process created  by  fork(2)
+  inherits  its  parent's  autogroup  membership.  Thus, all of the processes in a session are members of the same autogroup.  An autogroup is automatically destroyed when the
+  last process in the group terminates.
+
+  When autogrouping is enabled, all of the members of an autogroup are placed in the same kernel scheduler "task group".  The CFS scheduler employs an algorithm that equalizes
+  the distribution of CPU cycles across task groups.  The benefits of this for interactive desktop performance can be described via the following example.
+
+  Suppose  that there are two autogroups competing for the same CPU (i.e., presume either a single CPU system or the use of taskset(1) to confine all the processes to the same
+  CPU on an SMP system).  The first group contains ten CPU-bound processes from a kernel build started with make -j10.  The other contains a single CPU-bound process: a  video
+  player.   The  effect  of autogrouping is that the two groups will each receive half of the CPU cycles.  That is, the video player will receive 50% of the CPU cycles, rather
+  than just 9% of the cycles, which would likely lead to degraded video playback.  The situation on an SMP system is more complex, but the general  effect  is  the  same:  the
+  scheduler  distributes  CPU  cycles  across  task groups such that an autogroup that contains a large number of CPU-bound processes does not end up hogging CPU cycles at the
+  expense of the other jobs on the system.
+
+  A process's autogroup (task group) membership can be viewed via the file /proc/[pid]/autogroup:
+
+      $ cat /proc/1/autogroup
+      /autogroup-1 nice 0
+
+  This file can also be used to modify the CPU bandwidth allocated to an autogroup.  This is done by writing a number in the "nice" range to the file to  set  the  autogroup's
+  nice value.  The allowed range is from +19 (low priority) to -20 (high priority).  (Writing values outside of this range causes write(2) to fail with the error EINVAL.)
+
+  The  autogroup nice setting has the same meaning as the process nice value, but applies to distribution of CPU cycles to the autogroup as a whole, based on the relative nice
+  values of other autogroups.  For a process inside an autogroup, the CPU cycles that it receives will be a product of the autogroup's nice  value  (compared  to  other  auto‐
+  groups) and the process's nice value (compared to other processes in the same autogroup.
+
+  The use of the cgroups(7) CPU controller to place processes in cgroups other than the root CPU cgroup overrides the effect of autogrouping.
+
+  The  autogroup  feature groups only processes scheduled under non-real-time policies (SCHED_OTHER, SCHED_BATCH, and SCHED_IDLE).  It does not group processes scheduled under
+  real-time and deadline policies.  Those processes are scheduled according to the rules described earlier.
+
+
 auxv
+----
+
+  This contains the contents of the ELF interpreter information passed to the process at exec time.  The format is one unsigned long ID plus one unsigned long value for
+  each entry.  The last entry contains two zeros.  See also getauxval(3).
+
+  Permission to access this file is governed by a ptrace access mode PTRACE_MODE_READ_FSCREDS check; see ptrace(2).
+
+
 cgroup
+------
+
+  See cgroups(7).
+
+
 clear_refs
+----------
+
+  This is a write-only file, writable only by owner of the process.
+
+  The following values may be written to the file:
+
+  1 (since Linux 2.6.22)
+         Reset  the  PG_Referenced and ACCESSED/YOUNG bits for all the pages associated with the process.  (Before kernel 2.6.32, writing any nonzero value to this file
+         had this effect.)
+
+  2 (since Linux 2.6.32)
+         Reset the PG_Referenced and ACCESSED/YOUNG bits for all anonymous pages associated with the process.
+
+  3 (since Linux 2.6.32)
+         Reset the PG_Referenced and ACCESSED/YOUNG bits for all file-mapped pages associated with the process.
+
+  Clearing the PG_Referenced and ACCESSED/YOUNG bits provides a method to measure approximately how much memory a process is using.  One first inspects  the  values  in
+  the  "Referenced"  fields  for  the  VMAs  shown  in  /proc/[pid]/smaps  to get an idea of the memory footprint of the process.  One then clears the PG_Referenced and
+  ACCESSED/YOUNG bits and, after some measured time interval, once again inspects the values in the "Referenced" fields to get an idea of the change in memory footprint
+  of the process during the measured interval.  If one is interested only in inspecting the selected mapping types, then the value 2 or 3 can be used instead of 1.
+
+  Further values can be written to affect different properties:
+
+  4 (since Linux 3.11)
+         Clear the soft-dirty bit for all the pages associated with the process.  This is used (in conjunction with /proc/[pid]/pagemap) by the check-point restore sys‐
+         tem to discover which pages of a process have been dirtied since the file /proc/[pid]/clear_refs was written to.
+
+  5 (since Linux 4.0)
+         Reset the peak resident set size ("high water mark") to the process's current resident set size value.
+
+  Writing any value to /proc/[pid]/clear_refs other than those listed above has no effect.
+
+  The /proc/[pid]/clear_refs file is present only if the CONFIG_PROC_PAGE_MONITOR kernel configuration option is enabled.
+
 
 cmdline
 -------
@@ -33,10 +143,45 @@ cmdline
   And it's incorrectly writing to memory that should be used by argv.
   To fix the problem, use char s[16] instead of char *s.
 
+
 comm
+----
+
+  This file exposes the process's comm value—that is, the command name associated with the process.  Different threads in the same process may have different comm  val‐
+  ues,  accessible  via /proc/[pid]/task/[tid]/comm.  A thread may modify its comm value, or that of any of other thread in the same thread group (see the discussion of
+  CLONE_THREAD in clone(2)), by writing to the file /proc/self/task/[tid]/comm.  Strings longer than TASK_COMM_LEN (16) characters are silently truncated.
+
+  This file provides a superset of the prctl(2) PR_SET_NAME and PR_GET_NAME operations, and is employed by pthread_setname_np(3) when used to rename threads other  than
+  the caller.
+
+
 coredump_filter
+---------------
+
+  See core(5).
+
+
 cpuset
+------
+
+  See cpuset(7).
+
+
 cwd@
+----
+
+  This is a symbolic link to the current working directory of the process.  To find out the current working directory of process 20, for instance, you can do this:
+
+      $ cd /proc/20/cwd; /bin/pwd
+
+  Note that the pwd command is often a shell built-in, and might not work properly.  In bash(1), you may use pwd -P.
+
+  In a multithreaded process, the contents of this symbolic link are not available if the main thread has already terminated (typically by calling pthread_exit(3)).
+
+  Permission to dereference or read (readlink(2)) this symbolic link is governed by a ptrace access mode PTRACE_MODE_READ_FSCREDS check; see ptrace(2).
+
+
+
 environ
 exe@
 fd/
