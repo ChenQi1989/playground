@@ -381,6 +381,27 @@ static int show_proc_info(int argc, char **argv) {
 	}
 	fprintf(f, "\n");
 
+	/* examining uid_map and gid_map of the same process does not make much sense  */
+	/* see user_namespaces(7)  */
+
+	/* io  */
+	sprintf(entry, "/proc/%d/io", p);
+	ftemp = fopen(entry, "r");
+	if (ftemp == NULL)
+		error_and_exit("open %s failed: %m\n", entry);
+	fprintf(f, "                io : [START]\n");
+	fprintf(f, "                   : ");
+	while (fread(&c, 1, 1, ftemp)) {
+		if (c == '\n') {
+			fprintf(f, "\n");
+			fprintf(f, "                   : ");
+		} else if (!fwrite(&c, 1, 1, f))
+			error_and_exit("fwrite (c = %c) failed: %m\n", c);
+	}
+	fprintf(f, "\b\b\b\b\bio : [END]\n");
+	if (!feof(ftemp))
+		error_and_exit("something failed when reading %s: %m\n", entry);
+	fclose(ftemp);
 
 
 	return 0;
