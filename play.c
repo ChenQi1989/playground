@@ -412,14 +412,30 @@ static int show_proc_info(int argc, char **argv) {
 		error_and_exit("fopen %s failed: %m\n", entry);
 	fprintf(f, "            limits : [START]\n");
 	linep = NULL;
+	n = 0;
 	while (getline(&linep, &n, ftemp) > 0) {
 		fprintf(f, "                   : %s", linep);
 	}
 	fprintf(f, "            limits : [END]\n");
 	fclose(ftemp);
+	if (linep) {
+		free(linep);
+		linep = NULL;
+	}
 	
-
-
+	/* loginuid  */
+	/* why use getdelim? just to demonstrate another way  */
+	sprintf(entry, "/proc/%d/loginuid", p);
+	if ((ftemp = fopen(entry, "r")) == NULL)
+		error_and_exit("fopen %s failed: %m\n", entry);
+	fprintf(f, "          loginuid : ");
+	linep = NULL;
+	n = 0;
+	if (getdelim(&linep, &n, 0, ftemp) <= 0)
+		error_and_exit("getline %s failed: %m\n", entry);
+	fprintf(f, "%s\n", linep);
+	free(linep);
+	linep = NULL;
 
 	return 0;
 }

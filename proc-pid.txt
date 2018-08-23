@@ -433,6 +433,12 @@ io
 latency
 -------
 
+  CONFIG_HAVE_LATENCYTOP_SUPPORT=y
+  CONFIG_LATENCYTOP=y
+
+  It's used by `latencytop'. But I really doubt whether there's any people still using it.
+
+
 limits
 ------
 
@@ -441,7 +447,18 @@ limits
 
 
 loginuid
+--------
+
+  login user id of the process. perserved by child process.
+  -1 means that loginuid was not set. This is normal behavior for processes that were not spawned by any login process (e.g. for daemons). loginuid is -1 by default;
+  pam_loginuid module changes it to your user id whenever you login (in a tty/in DM/via ssh), and this value is preserved by child processes.
+
+
 map_files/
+----------
+
+
+
 maps
 mem
 mountinfo
