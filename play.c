@@ -14,6 +14,7 @@
 #include <signal.h>
 #include <sys/syscall.h>
 #include <linux/limits.h>
+#include <dirent.h>
 
 #include "play.h"
 
@@ -198,7 +199,7 @@ static int complex_daemon(int argc, char **argv) {
 		error_and_exit("chdir to / failed: %m\n");
 
 	/* close all other file descriptors  */
-	for (int i=getdtablesize(); i>0; i--)
+	for (int i=getdtablesize(); i>=0; i--)
 		close(i);
 
 	/* handle standard I/O  */
@@ -243,12 +244,15 @@ static int complex_daemon(int argc, char **argv) {
  */
 static int show_proc_info(int argc, char **argv) {
 	pid_t p;
-	FILE *f;	/* file for output stream  */
+	FILE *f;		/* file for output stream  */
 	FILE *ftemp;
+	DIR *dirp;		/* directory stream  */
+	struct dirent *dentp;	/* directory entry  */
 	char entry[PATH_MAX];	/* hold entry in /proc/pid/xxx  */
 	char buf[PATH_MAX];
 	char c;
 	int len;
+	int i;			/* for iteration  */
 
 	if (argc == 1)
 		f = stdout;
@@ -281,7 +285,7 @@ static int show_proc_info(int argc, char **argv) {
 	if (p < 0)
 		error_and_exit("getsid failed: %m\n");
 	fprintf(f, "               sid : %d\n", p);
-	
+
 	/* comm and cmdline  */
 	/* we could use prctl as an alternative  */
 	sprintf(entry, "/proc/%d/task/%ld/comm", getpid(), syscall(SYS_gettid));
@@ -325,7 +329,7 @@ static int show_proc_info(int argc, char **argv) {
 	else
 		error_and_exit("readlink %s failed: %m\n", entry);
 	fprintf(f, "               cwd : %s\n", buf);
-	
+
 	/* _initial_ environment  */
 	sprintf(entry, "/proc/%d/environ", p);
 	ftemp = fopen(entry, "r");
@@ -351,9 +355,21 @@ static int show_proc_info(int argc, char **argv) {
 	else
 		error_and_exit("readlink %s failed: %m\n", entry);
 	fprintf(f, "               exe : %s\n", buf);
-	
 
-	return 0;	
+	/* fd  */
+	/* dummy method for easier ordering  */
+	fprintf(f, "                fd : [START]\n");
+	for (i=0; i<=getdtablesize(); i++) {
+		sprintf(entry, "/proc/%d/fd/%d", p, i);
+		if ((len = readlink(entry, buf, PATH_MAX-1)) > 0) {
+			buf[len] = 0;
+			fprintf(f, "                   : %d -> %s\n", i, buf);
+		}
+	}
+	fprintf(f, "                fd : [END]\n");
+
+
+	return 0;
 }
 
 /*
