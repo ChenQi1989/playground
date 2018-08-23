@@ -431,7 +431,15 @@ io
 
 
 latency
+-------
+
 limits
+------
+
+  This  file  displays  the  soft  limit,  hard limit, and units of measurement for each of the process's resource limits (see getrlimit(2)).  Up to and including Linux
+  2.6.35, this file is protected to allow reading only by the real UID of the process.  Since Linux 2.6.36, this file is readable by all users on the system.
+
+
 loginuid
 map_files/
 maps

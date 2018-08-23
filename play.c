@@ -247,12 +247,14 @@ static int show_proc_info(int argc, char **argv) {
 	FILE *f;		/* file for output stream  */
 	FILE *ftemp;
 	DIR *dirp;		/* directory stream  */
+	char *linep;		/* line pointer  */
 	struct dirent *dentp;	/* directory entry  */
 	char entry[PATH_MAX];	/* hold entry in /proc/pid/xxx  */
 	char buf[PATH_MAX];
 	char c;
 	int len;
 	int i;			/* for iteration  */
+	size_t n;		/* for size_t vars  */
 
 	if (argc == 1)
 		f = stdout;
@@ -402,6 +404,21 @@ static int show_proc_info(int argc, char **argv) {
 	if (!feof(ftemp))
 		error_and_exit("something failed when reading %s: %m\n", entry);
 	fclose(ftemp);
+	
+	/* limits  */
+	/* why use getline here? just to demonstrate another way  */
+	sprintf(entry, "/proc/%d/limits", p);
+	if ((ftemp = fopen(entry, "r")) == NULL)
+		error_and_exit("fopen %s failed: %m\n", entry);
+	fprintf(f, "            limits : [START]\n");
+	linep = NULL;
+	while (getline(&linep, &n, ftemp) > 0) {
+		fprintf(f, "                   : %s", linep);
+	}
+	fprintf(f, "            limits : [END]\n");
+	fclose(ftemp);
+	
+
 
 
 	return 0;
