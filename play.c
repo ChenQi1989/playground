@@ -368,6 +368,20 @@ static int show_proc_info(int argc, char **argv) {
 	}
 	fprintf(f, "                fd : [END]\n");
 
+	/* fdinfo  */
+	/* we might need to do more, but for now, output entries is enough  */
+	sprintf(entry, "/proc/%d/fdinfo", p);
+	dirp = opendir(entry);
+	if (dirp == NULL)
+		error_and_exit("open dir %s failed: %m\n", entry);
+	fprintf(f, "            fdinfo :");
+	while ((dentp = readdir(dirp)) != NULL) {
+		if (!(!strcmp(dentp->d_name, ".") || !strcmp(dentp->d_name, "..")))
+			fprintf(f, " %s", dentp->d_name);
+	}
+	fprintf(f, "\n");
+
+
 
 	return 0;
 }
