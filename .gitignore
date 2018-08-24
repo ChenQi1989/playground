@@ -1,4 +1,3 @@
-debug.strace
 *~
 *.o
 kernel-rootfs/
@@ -6,3 +5,4 @@ temp/
 container-root/
 chroot_root/
 play
+debug.strace
