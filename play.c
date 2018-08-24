@@ -2,6 +2,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <fcntl.h>
@@ -55,6 +56,66 @@ static int func_test(int argc, char **argv) {
 		printf("\t%s\n", *arg);
 		++arg;
 	}
+	return 0;
+}
+
+/* output contents of argv[1], starting from postition argv[2] with length of argv[3]  */
+/*
+ * FILE: 0 ... pa_offset ... offset ... offset + length
+ * MMAP: (addr)pa_offset ... offset ... offset + length
+ * so the mapped file is a little longer than required to meet the page aligning requirement
+ */
+static int test_mmap(int argc, char **argv) {
+	char *addr;
+	int fd;
+	struct stat sb;
+	off_t offset, pa_offset;
+	size_t length;
+	ssize_t s;
+
+	if (argc < 3 || argc > 4)
+		error_and_exit("test_mmap FILE OFFSET [LENGTH]\n");
+
+	if ((fd = open(argv[1], O_RDONLY)) < 0)
+		error_and_exit("open %s failed: %m\n", argv[1]);
+
+	/* get file size  */
+	if (fstat(fd, &sb) < 0)
+		error_and_exit("fstat %s failed: %m\n", argv[1]);
+
+	/* get offset and check validity  */
+	offset = atoi(argv[2]);
+	pa_offset = offset & ~(sysconf(_SC_PAGE_SIZE) - 1);	/* mmap's offset must be page aligned  */
+	if (offset >= sb.st_size)
+		error_and_exit("%ld has passed the file end\n", offset);
+
+	/* get length and adjust it  */
+	if (argc == 4) {
+		length = atoi(argv[3]);
+		if (offset + length > sb.st_size)
+			length = sb.st_size - offset;
+	} else {
+		length = sb.st_size - offset;
+	}
+
+	/* mmap file  */
+	addr = mmap(NULL, length + offset - pa_offset, PROT_READ, MAP_PRIVATE, fd, pa_offset);
+	if (addr == MAP_FAILED)
+		error_and_exit("mmap failed: %m\n");
+
+	/* write out  */
+	s = write(1, addr + offset - pa_offset, length);
+	if (s < 0)
+		error_and_exit("write failed: %m\n");
+	if (s != length)
+		error_and_exit("partial write\n");
+
+	/* munmap file  */
+	munmap(addr, length + offset - pa_offset);
+
+	/* close the file  */
+	close(fd);
+
 	return 0;
 }
 
@@ -404,7 +465,7 @@ static int show_proc_info(int argc, char **argv) {
 	if (!feof(ftemp))
 		error_and_exit("something failed when reading %s: %m\n", entry);
 	fclose(ftemp);
-	
+
 	/* limits  */
 	/* why use getline here? just to demonstrate another way  */
 	sprintf(entry, "/proc/%d/limits", p);
@@ -422,7 +483,7 @@ static int show_proc_info(int argc, char **argv) {
 		free(linep);
 		linep = NULL;
 	}
-	
+
 	/* loginuid  */
 	/* why use getdelim? just to demonstrate another way  */
 	sprintf(entry, "/proc/%d/loginuid", p);
@@ -436,6 +497,9 @@ static int show_proc_info(int argc, char **argv) {
 	fprintf(f, "%s\n", linep);
 	free(linep);
 	linep = NULL;
+
+	/* map_files/  */
+
 
 	return 0;
 }
@@ -486,6 +550,7 @@ static int tinyinit(int argc, char **argv) {
 /* define the function table */
 static struct func_tab functab[NFUNCS] = {
 	{"func_test", func_test},
+	{"test_mmap", test_mmap},
 	{"chroot_and_list", chroot_and_list},
 	{"malloc_and_free", malloc_and_free},
 	{"create_zombie", create_zombie_process},
