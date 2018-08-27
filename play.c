@@ -443,6 +443,8 @@ static int show_proc_info(int argc, char **argv) {
 			fprintf(f, " %s", dentp->d_name);
 	}
 	fprintf(f, "\n");
+	closedir(dirp);
+	dirp = NULL;
 
 	/* examining uid_map and gid_map of the same process does not make much sense  */
 	/* see user_namespaces(7)  */
@@ -499,7 +501,23 @@ static int show_proc_info(int argc, char **argv) {
 	linep = NULL;
 
 	/* map_files/  */
-
+	sprintf(entry, "/proc/%d/map_files", p);
+	dirp = opendir(entry);
+	if (dirp == NULL)
+		error_and_exit("opendir %s failed: %m\n", entry);
+	fprintf(f, "         map_files : [START]\n");
+	while ((dentp = readdir(dirp)) != NULL) {
+		sprintf(entry, "/proc/%d/map_files/%s", p, dentp->d_name);
+		if (!strcmp(dentp->d_name, ".") || !strcmp(dentp->d_name, ".."))
+			continue;
+		if ((len = readlink(entry, buf, PATH_MAX-1)) > 0) {
+			buf[len] = 0;
+			fprintf(f, "                   : %s -> %s\n", dentp->d_name, buf);
+		}
+	}
+	fprintf(f, "         map_files : [END]\n");
+	closedir(dirp);
+	dirp = NULL;
 
 	return 0;
 }
