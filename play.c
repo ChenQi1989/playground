@@ -519,6 +519,25 @@ static int show_proc_info(int argc, char **argv) {
 	closedir(dirp);
 	dirp = NULL;
 
+	/* maps  */
+	sprintf(entry, "/proc/%d/maps", p);
+	ftemp = fopen(entry, "r");
+	if (ftemp == NULL)
+		error_and_exit("fopen %s failed: %m\n", entry);
+	fprintf(f, "              maps : [START]\n");
+	while(getline(&linep, &n, ftemp) > 0) {
+		fprintf(f, "                   : %s", linep);
+	}
+	fclose(ftemp);
+	if (linep) {
+		free(linep);
+		linep = NULL;	
+	}
+	fprintf(f, "              maps : [END]\n");
+	
+
+
+
 	return 0;
 }
 
