@@ -544,6 +544,23 @@ static int show_proc_info(int argc, char **argv) {
 	fprintf(f, "               mem : [available]\n");
 	fclose(ftemp);
 
+	/* mountinfo  */
+	sprintf(entry, "/proc/%d/mountinfo", p);
+	ftemp = fopen(entry, "r");
+	if (ftemp == NULL)
+		error_and_exit("fopen %s failed: %m\n", entry);
+	fprintf(f, "         mountinfo : [START]\n");
+	while(getline(&linep, &n, ftemp) > 0) {
+		fprintf(f, "                   : %s", linep);
+	}
+	fclose(ftemp);
+	if (linep) {
+		free(linep);
+		linep = NULL;	
+	}
+	fprintf(f, "         mountinfo : [END]\n");
+	
+
 
 	return 0;
 }
