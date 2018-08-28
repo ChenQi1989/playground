@@ -632,11 +632,19 @@ mountstats
 
 net/
 ----
-
+  TODO
 
 
 ns/
+---
+
+  This is a subdirectory containing one entry for each namespace that supports being manipulated by setns(2).  For more information, see namespaces(7).
+
+
 numa_maps
+---------
+
+
 oom_adj
 oom_score
 oom_score_adj

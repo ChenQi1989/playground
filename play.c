@@ -592,6 +592,29 @@ static int show_proc_info(int argc, char **argv) {
 	}
 	fprintf(f, "        mountstats : [END]\n");
 
+	/* net/: TODO  */
+	
+	/* ns/  */
+	sprintf(entry, "/proc/%d/ns", p);
+	dirp = opendir(entry);
+	if (dirp == NULL)
+		error_and_exit("opendir %s failed: %m\n", entry);
+	fprintf(f, "                ns : [START]\n");
+	while ((dentp = readdir(dirp)) != NULL) {
+		sprintf(entry, "/proc/%d/ns/%s", p, dentp->d_name);
+		if (!strcmp(dentp->d_name, ".") || !strcmp(dentp->d_name, ".."))
+			continue;
+		if ((len = readlink(entry, buf, PATH_MAX-1)) > 0) {
+			buf[len] = 0;
+			fprintf(f, "                   : %s -> %s\n", dentp->d_name, buf);
+		}
+	}
+	fprintf(f, "               ns : [END]\n");
+	closedir(dirp);
+	dirp = NULL;
+
+
+
 	return 0;
 }
 
