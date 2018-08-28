@@ -531,10 +531,10 @@ static int show_proc_info(int argc, char **argv) {
 	fclose(ftemp);
 	if (linep) {
 		free(linep);
-		linep = NULL;	
+		linep = NULL;
 	}
 	fprintf(f, "              maps : [END]\n");
-	
+
 	/* mem  */
 	/* it mostly needs to be used together with /proc/pid/maps  */
 	sprintf(entry, "/proc/%d/mem", p);
@@ -556,10 +556,10 @@ static int show_proc_info(int argc, char **argv) {
 	fclose(ftemp);
 	if (linep) {
 		free(linep);
-		linep = NULL;	
+		linep = NULL;
 	}
 	fprintf(f, "         mountinfo : [END]\n");
-	
+
 
 
 	return 0;
