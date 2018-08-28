@@ -560,7 +560,37 @@ static int show_proc_info(int argc, char **argv) {
 	}
 	fprintf(f, "         mountinfo : [END]\n");
 
+	/* mounts  */
+	sprintf(entry, "/proc/%d/mounts", p);
+	ftemp = fopen(entry, "r");
+	if (ftemp == NULL)
+		error_and_exit("fopen %s failed: %m\n", entry);
+	fprintf(f, "            mounts : [START]\n");
+	while(getline(&linep, &n, ftemp) > 0) {
+		fprintf(f, "                   : %s", linep);
+	}
+	fclose(ftemp);
+	if (linep) {
+		free(linep);
+		linep = NULL;
+	}
+	fprintf(f, "            mounts : [END]\n");
 
+	/* mountstats  */
+	sprintf(entry, "/proc/%d/mountstats", p);
+	ftemp = fopen(entry, "r");
+	if (ftemp == NULL)
+		error_and_exit("fopen %s failed: %m\n", entry);
+	fprintf(f, "        mountstats : [START]\n");
+	while(getline(&linep, &n, ftemp) > 0) {
+		fprintf(f, "                   : %s", linep);
+	}
+	fclose(ftemp);
+	if (linep) {
+		free(linep);
+		linep = NULL;
+	}
+	fprintf(f, "        mountstats : [END]\n");
 
 	return 0;
 }
