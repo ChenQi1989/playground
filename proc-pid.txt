@@ -543,10 +543,24 @@ maps
 
   Under Linux 2.0, there is no field giving pathname.
 
+  A brief intro to vdso: for effeciency purpose, frequently used system calls could be done via vdso so that a normal function call + a few memory access is used instead
+  of the expensive system call.
 
 
 mem
+---
+
+  This file can be used to access the pages of a process's memory through open(2), read(2), and lseek(2).
+
+  Permission to access this file is governed by a ptrace access mode PTRACE_MODE_ATTACH_FSCREDS check; see ptrace(2).
+
+
 mountinfo
+---------
+
+
+
+
 mounts
 mountstats
 net/

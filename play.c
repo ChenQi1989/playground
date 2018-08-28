@@ -535,7 +535,14 @@ static int show_proc_info(int argc, char **argv) {
 	}
 	fprintf(f, "              maps : [END]\n");
 	
-
+	/* mem  */
+	/* it mostly needs to be used together with /proc/pid/maps  */
+	sprintf(entry, "/proc/%d/mem", p);
+	ftemp = fopen(entry, "r");
+	if (ftemp == NULL)
+		error_and_exit("fopen %s failed: %m\n", entry);
+	fprintf(f, "               mem : [available]\n");
+	fclose(ftemp);
 
 
 	return 0;
