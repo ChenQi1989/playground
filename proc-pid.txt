@@ -797,12 +797,111 @@ oom_score_adj
 pagemap
 -------
 
+  This file shows the mapping of each of the process's virtual pages into physical page frames or swap area.  It contains one 64-bit value for each virtual  page,  with
+  the bits set as follows:
+
+       63     If set, the page is present in RAM.
+
+       62     If set, the page is in swap space
+
+       61 (since Linux 3.5)
+              The page is a file-mapped page or a shared anonymous page.
+
+       60-56 (since Linux 3.11)
+              Zero
+
+       55 (since Linux 3.11)
+              PTE is soft-dirty (see the kernel source file Documentation/vm/soft-dirty.txt).
+
+       54-0   If  the  page is present in RAM (bit 63), then these bits provide the page frame number, which can be used to index /proc/kpageflags and /proc/kpagecount.
+              If the page is present in swap (bit 62), then bits 4-0 give the swap type, and bits 54-5 encode the swap offset.
+
+  Before Linux 3.11, bits 60-55 were used to encode the base-2 log of the page size.
+
+  To employ /proc/[pid]/pagemap efficiently, use /proc/[pid]/maps to determine which areas of memory are actually mapped and seek to skip over unmapped regions.
+
+  The /proc/[pid]/pagemap file is present only if the CONFIG_PROC_PAGE_MONITOR kernel configuration option is enabled.
+
+  Permission to access this file is governed by a ptrace access mode PTRACE_MODE_READ_FSCREDS check; see ptrace(2).
+
+
 personality
+-----------
+
+  This read-only file exposes the process's execution domain, as set by personality(2).  The value is displayed in hexadecimal notation.
+
+  Permission to access this file is governed by a ptrace access mode PTRACE_MODE_ATTACH_FSCREDS check; see ptrace(2).
+
+  Linux  supports  different  execution  domains,  or  personalities, for each process.  Among other things, execution domains tell Linux how to map signal numbers into signal
+  actions.  The execution domain system allows Linux to provide limited support for binaries compiled under other UNIX-like operating systems.
+
+
 projid_map
+----------
+
+  TODO
+
+
 root@
+-----
+
+  UNIX and Linux support the idea of a per-process root of the filesystem, set by the chroot(2) system call.  This file is a symbolic link that points to the  process's
+  root directory, and behaves in the same way as exe, and fd/*.
+
+  Note  however  that  this file is not merely a symbolic link.  It provides the same view of the filesystem (including namespaces and the set of per-process mounts) as
+  the process itself.  An example illustrates this point.  In one terminal, we start a shell in new user and mount namespaces, and in that  shell  we  create  some  new
+  mount points:
+
+      $ PS1='sh1# ' unshare -Urnm
+      sh1# mount -t tmpfs tmpfs /etc  # Mount empty tmpfs at /etc
+      sh1# mount --bind /usr /dev     # Mount /usr at /dev
+      sh1# echo $$
+      27123
+
+  In a second terminal window, in the initial mount namespace, we look at the contents of the corresponding mounts in the initial and new namespaces:
+
+      $ PS1='sh2# ' sudo sh
+      sh2# ls /etc | wc -l                  # In initial NS
+      309
+      sh2# ls /proc/27123/root/etc | wc -l  # /etc in other NS
+      0                                     # The empty tmpfs dir
+      sh2# ls /dev | wc -l                  # In initial NS
+      205
+      sh2# ls /proc/27123/root/dev | wc -l  # /dev in other NS
+      11                                    # Actually bind
+                                            # mounted to /usr
+      sh2# ls /usr | wc -l                  # /usr in initial NS
+      11
+
+  In  a  multithreaded  process,  the  contents  of the /proc/[pid]/root symbolic link are not available if the main thread has already terminated (typically by calling
+  pthread_exit(3)).
+
+  Permission to dereference or read (readlink(2)) this symbolic link is governed by a ptrace access mode PTRACE_MODE_READ_FSCREDS check; see ptrace(2).
+
+
 sched
+-----
+
+  Not much information.
+
+
 schedstat
+---------
+
+  schedstats also adds a new /proc/<pid>/schedstat file to include some of
+  the same information on a per-process level.  There are three fields in
+  this file correlating for that process to:
+       1) time spent on the cpu
+       2) time spent waiting on a runqueue
+       3) # of timeslices run on this cpu
+
+
 sessionid
+---------
+
+  Related to Linux audit.
+
+
 setgroups
 smaps
 stack

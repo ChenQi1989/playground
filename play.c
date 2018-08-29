@@ -658,6 +658,66 @@ static int show_proc_info(int argc, char **argv) {
 	}
 	fclose(ftemp);
 
+	/* pagemap: TODO  */
+	
+	/* projid_map  */
+	/* similar to uid_map and gid_map, do self examining does not make much sense  */
+	
+	/* root  */
+	sprintf(entry, "/proc/%d/root", p);
+	len = readlink(entry, buf, PATH_MAX-1);
+	if (len > 0)
+		buf[len] = 0;
+	else
+		error_and_exit("readlink %s failed: %m\n", entry);
+	fprintf(f, "              root : %s\n", buf);
+	
+	/* sched  */
+	sprintf(entry, "/proc/%d/sched", p);
+	ftemp = fopen(entry, "r");
+	if (ftemp == NULL)
+		error_and_exit("fopen %s failed: %m\n", entry);
+	fprintf(f, "             sched : [START]\n");
+	while(getline(&linep, &n, ftemp) > 0) {
+		fprintf(f, "                   : %s", linep);
+	}
+	fclose(ftemp);
+	if (linep) {
+		free(linep);
+		linep = NULL;
+	}
+	fprintf(f, "             sched : [END]\n");
+	
+	/* schedstats  */
+	sprintf(entry, "/proc/%d/schedstat", p);
+	ftemp = fopen(entry, "r");
+	if (ftemp == NULL)
+		error_and_exit("fopen %s failed: %m\n", entry);
+	fprintf(f, "         schedstat : ");
+	if (getline(&linep, &n, ftemp) < 0)
+		error_and_exit("getline %s failed: %m\n", entry);
+	fprintf(f, "%s", linep);
+	if (linep) {
+		free(linep);
+		linep = NULL;	
+	}
+	fclose(ftemp);
+
+	/* sessionid  */
+	sprintf(entry, "/proc/%d/sessionid", p);
+	ftemp = fopen(entry, "r");
+	if (ftemp == NULL)
+		error_and_exit("fopen %s failed: %m\n", entry);
+	fprintf(f, "         sessionid : ");
+	if (getline(&linep, &n, ftemp) < 0)
+		error_and_exit("getline %s failed: %m\n", entry);
+	fprintf(f, "%s\n", linep);
+	if (linep) {
+		free(linep);
+		linep = NULL;	
+	}
+	fclose(ftemp);
+
 
 	return 0;
 }
