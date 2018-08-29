@@ -723,10 +723,20 @@ static int show_proc_info(int argc, char **argv) {
 }
 
 /*
+ * output process info to @outfile when receiving SIGINT
+ */
+static void sig_handler_process_info(int sig) {
+	show_proc_info(1, NULL);
+}
+
+/*
  * use inotify to monitor the creation/removal of a file
  * and sync it with the other
  */
 static int _monitor_and_sync(const char *srcf, const char *dstf) {
+	while(1) {
+		sleep(10);	
+	}
 	return 0;
 }
 
@@ -736,6 +746,8 @@ static int monitor_and_sync(int argc, char **argv) {
 	assert(argc == 3);
 	srcf = argv[1];
 	dstf = argv[2];
+
+	signal(SIGINT, sig_handler_process_info);
 
 	return _monitor_and_sync(srcf, dstf);
 }
