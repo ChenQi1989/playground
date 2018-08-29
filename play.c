@@ -609,10 +609,54 @@ static int show_proc_info(int argc, char **argv) {
 			fprintf(f, "                   : %s -> %s\n", dentp->d_name, buf);
 		}
 	}
-	fprintf(f, "               ns : [END]\n");
+	fprintf(f, "                ns : [END]\n");
 	closedir(dirp);
 	dirp = NULL;
 
+	/* oom_adj  */
+	sprintf(entry, "/proc/%d/oom_adj", p);
+	ftemp = fopen(entry, "r");
+	if (ftemp == NULL)
+		error_and_exit("fopen %s failed: %m\n", entry);
+	fprintf(f, "           oom_adj : ");
+	if (getline(&linep, &n, ftemp) < 0)
+		error_and_exit("getline %s failed: %m\n", entry);
+	fprintf(f, "%s", linep);
+	if (linep) {
+		free(linep);
+		linep = NULL;	
+	}
+	fclose(ftemp);
+
+	/* oom_score  */
+	sprintf(entry, "/proc/%d/oom_score", p);
+	ftemp = fopen(entry, "r");
+	if (ftemp == NULL)
+		error_and_exit("fopen %s failed: %m\n", entry);
+	fprintf(f, "         oom_score : ");
+	if (getline(&linep, &n, ftemp) < 0)
+		error_and_exit("getline %s failed: %m\n", entry);
+	fprintf(f, "%s", linep);
+	if (linep) {
+		free(linep);
+		linep = NULL;	
+	}
+	fclose(ftemp);
+
+	/* oom_score_adj  */
+	sprintf(entry, "/proc/%d/oom_score_adj", p);
+	ftemp = fopen(entry, "r");
+	if (ftemp == NULL)
+		error_and_exit("fopen %s failed: %m\n", entry);
+	fprintf(f, "     oom_score_adj : ");
+	if (getline(&linep, &n, ftemp) < 0)
+		error_and_exit("getline %s failed: %m\n", entry);
+	fprintf(f, "%s", linep);
+	if (linep) {
+		free(linep);
+		linep = NULL;	
+	}
+	fclose(ftemp);
 
 
 	return 0;
