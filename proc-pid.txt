@@ -905,6 +905,12 @@ sessionid
 setgroups
 ---------
 
+  See user_namespaces(7).
+
+  """
+  In the case of gid_map, use of the setgroups(2) system call must first be denied by writing "deny" to the /proc/[pid]/setgroups file (see below) before  writing  to
+  gid_map.
+  """
 
 smaps
 stack
