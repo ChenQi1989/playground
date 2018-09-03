@@ -16,6 +16,7 @@
 #include <sys/syscall.h>
 #include <linux/limits.h>
 #include <dirent.h>
+#include <libgen.h>
 
 #include "play.h"
 
@@ -56,6 +57,22 @@ static int func_test(int argc, char **argv) {
 		printf("\t%s\n", *arg);
 		++arg;
 	}
+	return 0;
+}
+
+static int test_dirname(int argc, char **argv) {
+	char *path, *base_dir;
+
+	if (argc != 2)
+		error_and_exit("test_dirname <path>\n");
+
+	if ((path = strdup(argv[1])) == NULL)
+		error_and_exit("strdup %s failed: %m\n", argv[1]);
+	base_dir = strdup(dirname(path));
+	if (base_dir == NULL)
+		error_and_exit("strdup dirname %s failed: %m\n", path);
+	else
+		printf("base_dir = %s\n", base_dir);
 	return 0;
 }
 
@@ -796,6 +813,7 @@ static int tinyinit(int argc, char **argv) {
 static struct func_tab functab[NFUNCS] = {
 	{"func_test", func_test},
 	{"test_mmap", test_mmap},
+	{"test_dirname", test_dirname},
 	{"chroot_and_list", chroot_and_list},
 	{"malloc_and_free", malloc_and_free},
 	{"create_zombie", create_zombie_process},
