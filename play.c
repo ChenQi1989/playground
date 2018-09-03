@@ -750,6 +750,31 @@ static int show_proc_info(int argc, char **argv) {
 	}
 	fclose(ftemp);
 
+	/* smaps  */
+	sprintf(entry, "/proc/%d/smaps", p);
+	ftemp = fopen(entry, "r");
+	if (ftemp == NULL)
+		error_and_exit("fopen %s failed: %m\n", entry);
+	fprintf(f, "             smaps : [shows memory consumption for each of the process's mappings, too long thus snipped]\n");
+	fclose(ftemp);
+
+	/* stack*/
+	sprintf(entry, "/proc/%d/stack", p);
+	ftemp = fopen(entry, "r");
+	if (ftemp == NULL)
+		error_and_exit("fopen %s failed: %m\n", entry);
+	fprintf(f, "             stack : [START]\n");
+	while(getline(&linep, &n, ftemp) > 0) {
+		fprintf(f, "                   : %s", linep);
+	}
+	fclose(ftemp);
+	if (linep) {
+		free(linep);
+		linep = NULL;
+	}
+	fprintf(f, "             stack : [END]\n");
+
+
 
 	return 0;
 }
