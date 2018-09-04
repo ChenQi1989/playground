@@ -1,10 +1,12 @@
-TARGETS = play
+TARGETS = play mydaemon
 ALL: $(TARGETS)
 
 CFLAGS ?= -Wall
 
 play: play.c play.h
 	$(CC) $(CFLAGS) -o play play.c
+mydaemon: small-talk-daemon-types.c
+	$(CC) $(CFLAGS) -o mydaemon small-talk-daemon-types.c
 
 clean:
 	rm -f *~

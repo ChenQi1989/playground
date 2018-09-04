@@ -6,3 +6,4 @@ container-root/
 chroot_root/
 play
 debug.strace
+mydaemon
