@@ -816,6 +816,38 @@ static int show_proc_info(int argc, char **argv) {
 	}
 	fprintf(f, "            status : [END]\n");
 
+	/* syscall  */
+	sprintf(entry, "/proc/%d/syscall", p);
+	ftemp = fopen(entry, "r");
+	if (ftemp == NULL)
+		error_and_exit("fopen %s failed: %m\n", entry);
+	fprintf(f, "           syscall : ");
+	if (getline(&linep, &n, ftemp) < 0)
+		error_and_exit("getline %s failed: %m\n", entry);
+	fprintf(f, "%s", linep);
+	if (linep) {
+		free(linep);
+		linep = NULL;	
+	}
+	fclose(ftemp);
+
+	/* task/: TODO  */
+
+	/* wchan  */
+	sprintf(entry, "/proc/%d/wchan", p);
+	ftemp = fopen(entry, "r");
+	if (ftemp == NULL)
+		error_and_exit("fopen %s failed: %m\n", entry);
+	fprintf(f, "             wchan : ");
+	if (getline(&linep, &n, ftemp) < 0)
+		error_and_exit("getline %s failed: %m\n", entry);
+	fprintf(f, "%s\n", linep);
+	if (linep) {
+		free(linep);
+		linep = NULL;	
+	}
+	fclose(ftemp);
+
 	return 0;
 }
 

@@ -1391,10 +1391,81 @@ status
 syscall
 -------
 
+  This file exposes the system call number and argument registers for the system call currently being executed by the process, followed  by  the  values  of  the  stack
+  pointer and program counter registers.  The values of all six argument registers are exposed, although most system calls use fewer registers.
+
+  If  the  process  is blocked, but not in a system call, then the file displays -1 in place of the system call number, followed by just the values of the stack pointer
+  and program counter.  If process is not blocked, then the file contains just the string "running".
+
+  This file is present only if the kernel was configured with CONFIG_HAVE_ARCH_TRACEHOOK.
+
+  Permission to access this file is governed by a ptrace access mode PTRACE_MODE_ATTACH_FSCREDS check; see ptrace(2).
+
+  See also syscalls(2), syscall(2). Also this webpage to grab some overview: https://filippo.io/linux-syscall-table/
 
 
 task/
+-----
+
+  This is a directory that contains one subdirectory for each thread in the process.  The name of each subdirectory is the numerical thread ID  ([tid])  of  the  thread
+  (see  gettid(2)).  Within each of these subdirectories, there is a set of files with the same names and contents as under the /proc/[pid] directories.  For attributes
+  that are shared by all threads, the contents for each of the files under the task/[tid] subdirectories will be the same as in the corresponding  file  in  the  parent
+  /proc/[pid] directory (e.g., in a multithreaded process, all of the task/[tid]/cwd files will have the same value as the /proc/[pid]/cwd file in the parent directory,
+  since all of the threads in a process share a working directory).  For attributes that are distinct for each thread, the corresponding files under task/[tid] may have
+  different  values (e.g., various fields in each of the task/[tid]/status files may be different for each thread), or they might not exist in /proc/[pid] at all.  In a
+  multithreaded process, the contents of the  /proc/[pid]/task  directory  are  not  available  if  the  main  thread  has  already  terminated  (typically  by  calling
+  pthread_exit(3)).
+
+
 timers
+------
+
+  A list of the POSIX timers for this process.  Each timer is listed with a line that starts with the string "ID:".  For example:
+
+      ID: 1
+      signal: 60/00007fff86e452a8
+      notify: signal/pid.2634
+      ClockID: 0
+      ID: 0
+      signal: 60/00007fff86e452a8
+      notify: signal/pid.2634
+      ClockID: 1
+
+  The lines shown for each timer have the following meanings:
+
+  ID     The  ID  for this timer.  This is not the same as the timer ID returned by timer_create(2); rather, it is the same kernel-internal ID that is available via the
+         si_timerid field of the siginfo_t structure (see sigaction(2)).
+
+  signal This is the signal number that this timer uses to deliver notifications followed by a slash, and then the sigev_value value supplied  to  the  signal  handler.
+         Valid only for timers that notify via a signal.
+
+  notify The part before the slash specifies the mechanism that this timer uses to deliver notifications, and is one of "thread", "signal", or "none".  Immediately fol‐
+         lowing the slash is either the string "tid" for timers with SIGEV_THREAD_ID notification, or "pid" for timers that notify by other mechanisms.   Following  the
+         "." is the PID of the process (or the kernel thread ID of the thread)  that will be delivered a signal if the timer delivers notifications via a signal.
+
+  ClockID
+         This field identifies the clock that the timer uses for measuring time.  For most clocks, this is a number that matches one of the user-space CLOCK_* constants
+         exposed via <time.h>.  CLOCK_PROCESS_CPUTIME_ID timers display with a value of -6 in this field.  CLOCK_THREAD_CPUTIME_ID timers display with a value of -2  in
+         this field.
+
+  This file is available only when the kernel was configured with CONFIG_CHECKPOINT_RESTORE.
+
+
 timerslack_ns
+-------------
+
+  See prctl(2) PR_SET_TIMERSLACK
+
+
 uid_map
+-------
+
+  similar to gid_map, see user_namespaces(7)
+
+
 wchan
+-----
+
+  The symbolic name corresponding to the location in the kernel where the process is sleeping.
+
+  Permission to access this file is governed by a ptrace access mode PTRACE_MODE_READ_FSCREDS check; see ptrace(2).
