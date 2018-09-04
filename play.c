@@ -774,7 +774,33 @@ static int show_proc_info(int argc, char **argv) {
 	}
 	fprintf(f, "             stack : [END]\n");
 
-
+	/* stat  */
+	fprintf(f, "              stat : [to do]\n");
+	
+	/* statm  */
+	int statm_size, statm_resident, statm_shared;
+	int statm_text, statm_lib, statm_data, statm_dt;	/* lib and dt are obsolete since 2.6  */
+	int num_scanf;
+	sprintf(entry, "/proc/%d/statm", p);
+	ftemp = fopen(entry, "r");
+	if (ftemp == NULL)
+		error_and_exit("fopen %s failed: %m\n", entry);
+	num_scanf = fscanf(ftemp, "%i %i %i %i %i %i %i", &statm_size, &statm_resident,
+			&statm_shared, &statm_text, &statm_lib, &statm_data, &statm_dt);
+	if (num_scanf != 7)
+		error_and_exit("fscanf %s failed, num_scanf = %u\n", entry, num_scanf);
+	fprintf(f, "             statm : [START]\n");
+	fprintf(f, "                   : %-10d(size)\n", statm_size);
+	fprintf(f, "                   : %-10d(resident)\n", statm_resident);
+	fprintf(f, "                   : %-10d(shared)\n", statm_shared);
+	fprintf(f, "                   : %-10d(text)\n", statm_text);
+	fprintf(f, "                   : %-10d(lib, obsolete)\n", statm_lib);
+	fprintf(f, "                   : %-10d(data)\n", statm_data);
+	fprintf(f, "                   : %-10d(dt, obsolete)\n", statm_dt);
+	fprintf(f, "             statm : [END]\n");
+	
+	fclose(ftemp);
+	
 
 	return 0;
 }
