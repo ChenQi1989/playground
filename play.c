@@ -798,9 +798,23 @@ static int show_proc_info(int argc, char **argv) {
 	fprintf(f, "                   : %-10d(data)\n", statm_data);
 	fprintf(f, "                   : %-10d(dt, obsolete)\n", statm_dt);
 	fprintf(f, "             statm : [END]\n");
-	
 	fclose(ftemp);
 	
+	/* status  */
+	sprintf(entry, "/proc/%d/status", p);
+	ftemp = fopen(entry, "r");
+	if (ftemp == NULL)
+		error_and_exit("fopen %s failed: %m\n", entry);
+	fprintf(f, "            status : [START]\n");
+	while(getline(&linep, &n, ftemp) > 0) {
+		fprintf(f, "                   : %s", linep);
+	}
+	fclose(ftemp);
+	if (linep) {
+		free(linep);
+		linep = NULL;
+	}
+	fprintf(f, "            status : [END]\n");
 
 	return 0;
 }
