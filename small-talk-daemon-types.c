@@ -253,8 +253,21 @@ void type_notify(void) {
 	}
 }
 
+/*
+ * Type=idle
+ *
+ * idle type is like simple type.
+ * daemons are written just like simple types.
+ * idle type is only useful for improving console output.
+ * Hence, it's usually used by services needing console interation.
+ * e.g. getty@.service, rescue.service, etc.
+ */
 void type_idle(void) {
-	return;	
+	for(;;) {
+		syslog(LOG_INFO, "%s: idle - %d\n", PROGNAME, counts);
+		sleep(INTERVAL);
+		counts++;	
+	}
 }
 
 int main(int argc, char **argv) {
