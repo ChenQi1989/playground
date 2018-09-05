@@ -4,10 +4,15 @@
  * COMPILE: 
  * 	gcc -o mydaemon small-talk-daemon-types.c
  * RUNTIME:
- *      START: systemd-run --user --unit=mydaemon.service --property=Type=TYPE /path/to/mydaemon --type-TYPE
- *      CHECK: systemctl --user status mydeamon.service
- *             systemctl --user cat mydaemon.service
- *      STOP:  systemctl --user stop mydaemon.service
+ *      START: 1) Write a simple unit file and start it
+ *                `./mydaemon gen-TYPE' for convenience
+ *             2) Or use systemd-run as a quick way to start.
+ *                e.g.
+ *                  systemd-run --unit=mydaemon.service --property=Type=TYPE /path/to/mydaemon --type-TYPE
+ *      CHECK: journal -n 10
+ *             systemctl  status  mydeamon.service
+ *             systemctl  cat     mydaemon.service
+ *      STOP:  systemctl  stop    mydaemon.service
  *      For more details, checkt the comments for each type.
  */
 
@@ -22,18 +27,28 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/file.h>
+#include <limits.h>
 
 /* mydaemon logs "mydaemon: TYPE - counts" every INTERVAL seconds  */
 #define INTERVAL 10
 const char *PROGNAME = "mydaemon";
 int counts = 0;
 
+/* for dbus type service, refer to previous small talk  */
+const char *dbus_url = "http://twiki.wrs.com/pub/PBUeng/CoreLinuxDevTeam/small-talk-dbus-intro.txt";
 
 /*
  **************************************************************
  *    HELP FUNCTIONS AND MACROS                               *
  **************************************************************
  */
+
+#define error_and_exit(...)				\
+do							\
+{							\
+	fprintf(stderr, __VA_ARGS__);			\
+	exit(1);					\
+} while (0)
 
 #define log_error_and_exit(...)				\
 do							\
@@ -42,6 +57,44 @@ do							\
 	exit(1);					\
 } while (0)
 
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
+
+void gen_unit_under_run(char *type) {
+	FILE *f;
+	char progpath[PATH_MAX];
+	const char *fname = "/run/systemd/system/mydaemon.service";
+
+	if (getcwd(progpath, PATH_MAX) == NULL)
+		error_and_exit("getcwd failed: %m\n");
+	strcat(progpath, "/mydaemon");
+	if ((f = fopen(fname, "w")) == NULL)
+		error_and_exit("failed to open %s: %m\n", fname);
+	fprintf(f, "[Unit]\n");
+	fprintf(f, "Description=mydaemon\n");
+	fprintf(f, "[Service]\n");
+	if (!strcmp(type, "simple")) {
+		fprintf(f, "Type=simple\n");
+	} else if (!strcmp(type, "forking")) {
+		fprintf(f, "Type=forking\n");
+		fprintf(f, "PIDFile=/tmp/mydaemon.pid\n");
+	} else if (!strcmp(type, "oneshot")) {
+		fprintf(f, "Type=oneshot\n");
+		fprintf(f, "RemainAfterExit=yes\n");
+	} else if (!strcmp(type, "dbus")) {
+		error_and_exit("For dbus type service, refer to %s\n", dbus_url);
+	} else if (!strcmp(type, "notify")) {
+		fprintf(f, "Type=notify\n");
+	} else if (!strcmp(type, "idle")) {
+		fprintf(f, "Type=idle\n");
+	} else
+		error_and_exit("unknown type %s to generate\n", type);
+	fprintf(f, "ExecStart=%s --type-%s\n", progpath, type);
+	printf("%s generated!\n", fname);
+
+	fclose(f);
+}
 
 /*
  **************************************************************
@@ -186,6 +239,8 @@ int main(int argc, char **argv) {
 		type_notify();
 	else if (!strcmp(argv[1], "--type-idle"))
 		type_idle();
+	else if (!strncmp(argv[1], "gen-", 4))
+		gen_unit_under_run(argv[1]+4);
 	else
 		log_error_and_exit("%s --type-TYPE (TYPE: simple, forking, oneshot, dbus, notify, idle)\n", PROGNAME);
 
