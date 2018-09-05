@@ -21,6 +21,7 @@
 #include <syslog.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/file.h>
 
 /* mydaemon logs "mydaemon: TYPE - counts" every INTERVAL seconds  */
 #define INTERVAL 10
@@ -93,12 +94,12 @@ void type_forking(void) {
 		fd = open("/tmp/mydaemon.pid", O_RDWR|O_CREAT, 0640);
 		if (fd < 0)
 			log_error_and_exit("open PID file failed: %m\n");
-		if (lockf(fd, F_TLOCK, 0) < 0)
-			log_error_and_exit("Already Running, lockf failed: %m\n");
+		if (flock(fd, LOCK_EX) < 0)
+			log_error_and_exit("Already Running, flock failed: %m\n");
 		sprintf(spid, "%d\n", pid);
 		write(fd, spid, strlen(spid));
 		fsync(fd);
-		if (lockf(fd, F_ULOCK, 0) < 0)
+		if (flock(fd, LOCK_UN) < 0)
 			log_error_and_exit("failed to unlock pid file: %m\n");
 		close(fd);
 		exit(0);
@@ -136,8 +137,8 @@ void type_forking(void) {
 		log_error_and_exit("failed to read PID file: %m\n");
 	if (atoi(spid) != (int)getpid())
 		log_error_and_exit("PID file contents not match the actual daemon pid! EXIT!\n");
-	if (lockf(fd, F_TLOCK, 0) < 0)
-		log_error_and_exit("trying to ensure one instance failed, lockf failed: %m\n");
+	if (flock(fd, LOCK_EX) < 0)
+		log_error_and_exit("trying to ensure one instance failed, flock failed: %m\n");
 
 	/* set file permission  */
 	umask(0);
