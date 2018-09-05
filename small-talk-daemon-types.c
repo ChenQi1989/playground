@@ -2,7 +2,8 @@
  * C codes to illustrate systemd daemon paradigm and traditional sysv daemon paradigm
  *
  * COMPILE: 
- * 	gcc -o mydaemon small-talk-daemon-types.c
+ * 	gcc -lsystemd -o mydaemon small-talk-daemon-types.c
+ *      Note that systemd-devel package is needed.
  * RUNTIME:
  *      START: 1) Write a simple unit file and start it
  *                `./mydaemon gen-TYPE' for convenience
@@ -28,6 +29,7 @@
 #include <sys/stat.h>
 #include <sys/file.h>
 #include <limits.h>
+#include <systemd/sd-daemon.h>
 
 /* mydaemon logs "mydaemon: TYPE - counts" every INTERVAL seconds  */
 #define INTERVAL 10
@@ -208,16 +210,47 @@ void type_forking(void) {
 	}
 }
 
+/*
+ * Type=oneshot
+ * RemainAfterExit=yes
+ *
+ * oneshot type service runs once and exits.
+ * Strictly speaking, it's not daemon. It just starts to finish something and exits.
+ */
 void type_oneshot(void) {
-	return;	
+	syslog(LOG_INFO, "mydaemon: oneshot - %d [Bye Bye]\n", counts);
 }
 
+/*
+ * Type=dbus
+ * BusName=xxx.xxx.xxx
+ *
+ * dbus type is actually like simple type, that is, it's coded as if it's running
+ * in foreground. systemd takes care of daemonization for it.
+ * However, it is expected that the daemon acquires a name on the D-Bus bus, as configured by BusName=.
+ */
 void type_dbus(void) {
-	return;	
+	log_error_and_exit("For dbus type service, refer to %s\n", dbus_url);
 }
 
+/*
+ * Type=notify
+ *
+ * notify type is like simple type, except that it will send notification to systemd
+ * manager to announce it has finished starting up.
+ */
 void type_notify(void) {
-	return;	
+	/* do whatever is needed before announcing started up  */
+	/* e.g. privilege checking, resource checking, etc.  */
+	
+	/* check sd_notify(3) for more info  */
+	sd_notify(0, "READY=1");
+
+	for(;;) {
+		syslog(LOG_INFO, "%s: notify - %d\n", PROGNAME, counts);
+		sleep(INTERVAL);
+		counts++;	
+	}
 }
 
 void type_idle(void) {
