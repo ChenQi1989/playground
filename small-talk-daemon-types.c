@@ -1,7 +1,7 @@
 /*
  * C codes to illustrate systemd daemon paradigm and traditional sysv daemon paradigm
  *
- * COMPILE: 
+ * COMPILE:
  * 	gcc -lsystemd -o mydaemon small-talk-daemon-types.c
  *      Note that systemd-devel package is needed.
  * RUNTIME:
@@ -106,7 +106,7 @@ void gen_unit_under_run(char *type) {
 
 /*
  * Type=simple
- * 
+ *
  * This is the default type for systemd services.
  * As you can see, no daemonization needs to be considered.
  * This is actually a foreground program. systemd takes care of daemonization.
@@ -116,17 +116,20 @@ void type_simple(void) {
 	for(;;) {
 		syslog(LOG_INFO, "%s: simple - %d\n", PROGNAME, counts);
 		sleep(INTERVAL);
-		counts++;	
+		counts++;
 	}
 }
 
 /*
  * Type=forking
  * PIDFile=/tmp/mydaemon.pid
- * 
+ *
  * This is the type for traditional sysv daemons that do fork-and-exit and
  * put the actuanl daemon service in child process.
- * Below is actually a typical traditional sysv daemon.
+ * Below is actually a traditional sysv daemon.
+ *
+ * Note that this daemon does not employ the so-called double forking technique.
+ * This is for simplicity and check the comments below related to setsid.
  */
 void type_forking(void) {
 	pid_t pid;
@@ -159,12 +162,24 @@ void type_forking(void) {
 		close(fd);
 		exit(0);
 	}
-	
+
 	/* below is the child process part, it's the the real daemon  */
 
+#ifdef NO_NEED_TO_USE_SETSID_IN_CASE_OF_SYSTEMD
 	/* obtain a new session */
+	/*
+	 * traditional sysv daemons will usually do double forking, that is,
+	 * 1) fork and exit; 2) setsid in child; 3) fork and exit in child; 4) leave a grandchild which does the actual work
+	 * This trick is used to ensure three things
+	 * 1) our daemon's parent process id PID 1
+	 * 2) detach from controlling terminal
+	 * 3) our daemon is not a session leader, and thus avoid potential acquirement of controlling terminals
+	 *
+	 * We don't need to do this in systemd, as such operations are all handled by systemd itself.
+	 */
 	if (setsid() < 0)
 		log_error_and_exit("setsid() failed: %m\n");
+#endif
 
 	/* change working directory  */
 	if (chdir("/") < 0)
@@ -242,14 +257,14 @@ void type_dbus(void) {
 void type_notify(void) {
 	/* do whatever is needed before announcing started up  */
 	/* e.g. privilege checking, resource checking, etc.  */
-	
+
 	/* check sd_notify(3) for more info  */
 	sd_notify(0, "READY=1");
 
 	for(;;) {
 		syslog(LOG_INFO, "%s: notify - %d\n", PROGNAME, counts);
 		sleep(INTERVAL);
-		counts++;	
+		counts++;
 	}
 }
 
@@ -266,7 +281,7 @@ void type_idle(void) {
 	for(;;) {
 		syslog(LOG_INFO, "%s: idle - %d\n", PROGNAME, counts);
 		sleep(INTERVAL);
-		counts++;	
+		counts++;
 	}
 }
 
