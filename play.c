@@ -17,6 +17,8 @@
 #include <linux/limits.h>
 #include <dirent.h>
 #include <libgen.h>
+#include <termios.h>
+#include <sys/wait.h>
 
 #include "play.h"
 
@@ -906,6 +908,361 @@ static int tinyinit(int argc, char **argv) {
 	return 0;
 }
 
+/* the active jobs are linked into a list, this is its head  */
+static job *first_job = NULL;
+/* keep track of the shell attributes  */
+static pid_t shell_pgid;
+static struct termios shell_tmodes;
+static int shell_terminal;
+static int shell_is_interactive;
+
+/* declaration of some functions  */
+static void put_job_in_foreground(job *j, int count);
+static void put_job_in_background(job *j, int count);
+static void wait_for_job(job *j);
+static void format_job_info(job *j, const char *status);
+static void free_job(job *j);
+
+static void free_job(job *j) {
+	if (j == NULL)
+		return;
+		
+	if (j->command)
+		free(j->command);
+
+	free(j);	
+}
+
+/* Find the active job with indicated pgid  */
+static job *find_job(pid_t pgid) {
+	job *j;
+	for (j=first_job; j; j=j->next) {
+		if (j->pgid == pgid)
+			return j;	
+	}
+	return NULL;
+}
+
+/* Return true if all processes in the job have completed or stopped  */
+static int job_is_stopped(job *j) {
+	process *p;
+	for (p=j->first_process; p; p=p->next) {
+		if (!p->completed && !p->stopped)
+			return 0;
+	}
+	return 1;
+}
+
+/* Return true if all processes in the job have completed  */
+static int job_is_completed(job *j) {
+	process *p;
+	for (p=j->first_process; p; p=p->next) {
+		if (!p->completed)
+			return 0;
+	}
+	return 1;
+}
+
+/* Make sure the shell is running interactively as the foreground job before proceeding  */
+static void init_shell(void) {
+	/* See if we are running interactively  */
+	shell_terminal = STDIN_FILENO;
+	shell_is_interactive = isatty(shell_terminal);
+	if (!shell_is_interactive)
+		return;
+
+	/* interactive shell; do below setups  */
+
+	/* loop until we are in the foreground  */
+	while (tcgetpgrp(shell_terminal) != (shell_pgid = getpgrp()))
+		kill(-shell_pgid, SIGTTIN);
+	/* ignore interactive and job-control signals  */
+	signal(SIGTTIN, SIG_IGN);
+	signal(SIGTTOU, SIG_IGN);
+	signal(SIGQUIT, SIG_IGN);
+	signal(SIGTSTP, SIG_IGN);
+	signal(SIGINT, SIG_IGN);
+	signal(SIGCHLD, SIG_IGN);
+	/* put ourselves in our own process group  */
+	shell_pgid = getpid();
+	if (setpgid(shell_pgid, shell_pgid) < 0)
+		error_and_exit("setpgid(%d, %d) failed: %m\n", shell_pgid, shell_pgid);	
+	/* grab control of the terminal  */
+	if (tcsetpgrp(shell_terminal, shell_pgid) < 0)
+		error_and_exit("tcsetpgrp failed: %m\n");
+	/* save the terminal attributes  */
+	if (tcgetattr(shell_terminal, &shell_tmodes) < 0)
+		error_and_exit("tcgetattr failed: %m\n");
+}
+
+static void launch_process(process *p, pid_t pgid, int infile, int outfile, int errfile, int foreground) {
+	pid_t pid;
+	
+	/*
+	 * if launched by interactive shell,
+	 * - set to be the process group header
+	 * - set to be the foreground process of the controlling terminal
+	 * - reset the signal handlers
+	 */
+	if (shell_is_interactive) {
+		pid = getpid();
+		if (pgid == 0)
+			pgid = pid;
+		if (setpgid(pid, pgid) < 0)
+			error_and_exit("launch_process: setpgid(%d, %d) failed: %m\n", pid, pgid);
+		if (foreground)
+			if (tcsetpgrp(shell_terminal, pgid) < 0)
+				error_and_exit("launch_process: tcsetpgrp failed: %m\n");
+		signal(SIGTTIN, SIG_IGN);
+		signal(SIGTTOU, SIG_IGN);
+		signal(SIGQUIT, SIG_IGN);
+		signal(SIGTSTP, SIG_IGN);
+		signal(SIGINT, SIG_IGN);
+		signal(SIGCHLD, SIG_IGN);
+	}
+	
+	/* set the standard input/output channels  */
+	if (infile != STDIN_FILENO) {
+		dup2(infile, STDIN_FILENO);
+		close(infile);
+	}
+	if (outfile != STDOUT_FILENO) {
+		dup2(outfile, STDOUT_FILENO);
+		close(outfile);	
+	}
+	if (errfile != STDERR_FILENO) {
+		dup2(errfile, STDERR_FILENO);
+		close(errfile);	
+	}
+	
+	/* exec the new process  */
+	execvp(p->argv[0], p->argv);
+	error_and_exit("execvp failed: %m\n");
+}
+
+static void launch_job(job *j, int foreground) {
+	process *p;
+	pid_t pid;
+	int mypipe[2], infile, outfile;
+	
+	/*
+	 * For a job (p1 | p2 | p3 | ... | pN),
+	 * p1's infile is stdin of job; outfile in pipe's write end;
+	 * p2 ... pN-1's infile is pipe's read end; outfile is pipe's write end;
+	 * pN's infile is pipe's read end; outfile is stdout of job
+	 *
+	 * Also, all processes in a job are child processes of shell.
+	 */
+	for (p = j->first_process; p; p=p->next) {
+		/* for every process, set its pgid and its input/output  */
+		if (p == j->first_process)
+			infile = j->stdin;
+		else
+			infile = mypipe[0];
+		if (p->next) {
+			if (pipe(mypipe) < 0)
+				error_and_exit("launch_job: creating pipe failed: %m\n");
+			outfile = mypipe[1];
+		} else
+			outfile = j->stdout;
+		pid = fork();
+		if (pid == 0) {
+			/* child process; do exec;  */	
+			launch_process(p, j->pgid, infile, outfile, j->stderr, foreground);
+		} else if (pid < 0) {
+			error_and_exit("launch_job: fork failed: %m\n");
+		} else {
+			p->pid = pid;
+			if (shell_is_interactive) {
+				if (!j->pgid) {
+					/* in this way, all proccess in the same job has the same pgid, which equals to the pid of the first child  */	
+					j->pgid = pid;
+				}
+				if (setpgid(pid, j->pgid) < 0)
+					error_and_exit("launch_job: setpgid(%d, %d) failed: %m\n", pid, j->pgid);
+			}	
+		}
+		/* parent process (shell): clean up the pipes (note: launch_process never returns)  */
+		/* the logic is, if infile (outfile) is a file descriptor related to pipe, clean it up as it has been used by child  */
+		if (infile != j->stdin)
+			close(infile);
+		if (outfile != j->stdout)
+			close(outfile);
+	}
+	
+	format_job_info(j, "launched");
+
+	if (!shell_is_interactive)
+		wait_for_job(j);
+	else if(foreground)
+		put_job_in_foreground(j, 0);
+	else
+		put_job_in_background(j, 0);
+}
+
+/*
+ * put job in foreground
+ * if count is nonzero, restore the job's terminal modes, send it SIGCONT
+ */
+static void put_job_in_foreground(job *j, int count) {
+	if (tcsetpgrp(shell_terminal, j->pgid) < 0)
+		error_and_exit("put_job_in_foreground: put job to foreground failed: %m\n");
+	if (count) {
+		tcsetattr(shell_terminal, TCSADRAIN, &j->tmodes);
+		if (kill(-j->pgid, SIGCONT) < 0)
+			error_and_exit("put_job_in_foreground: sending SIGCONT failed: %m\n");
+	}
+	
+	/* wait for job to report  */
+	wait_for_job(j);
+	
+	/* put shell back to foreground  */
+	if (tcsetpgrp(shell_terminal, shell_pgid) < 0)
+		error_and_exit("put_job_in_foreground: put shell back to foreground failed: %m\n");
+	tcgetattr(shell_terminal, &j->tmodes);
+	tcsetattr(shell_terminal, TCSADRAIN, &shell_tmodes);
+}
+
+/*
+ * this function will only be called when shell is in foreground
+ * so do nothing except sending SIGCONT when count is nonzero
+ */
+static void put_job_in_background(job *j, int count) {
+	if (count) {
+		if (kill(-j->pgid, SIGCONT) < 0)
+			error_and_exit("put_job_in_background: sending SIGCONT failed: %m\n");
+	}
+}
+
+/*
+ * store status of process pid that was returned by waitpid.
+ * return 0 if all went well; nonzero otherwise.
+ */
+static int make_process_status(pid_t pid, int status) {
+	job *j;
+	process *p;
+	
+	if (pid == 0)
+		/* no process ready to report  */
+		return -1;
+	else if (pid < 0 && errno == ECHILD)
+		/* no process ready to report  */
+		return -1;
+	else if (pid < 0) {
+		fprintf(stderr, "waitpid\n");
+		return -1;
+	}
+	
+	/* pid > 0  */
+	for (j=first_job; j; j=j->next) {
+		for (p=j->first_process; p; p=p->next) {
+			if (p->pid != pid)
+				continue;
+			/* found the specified process  */
+			p->status = status;
+			if (WIFSTOPPED(status))
+				p->stopped = 1;
+			else {
+				p->completed = 1;
+				if (WIFSIGNALED(status))
+					fprintf(stderr, "%d: Terminated by signal %d.\n",
+						(int)pid, WTERMSIG(status));	
+			}
+			return 0;
+		}	
+	}
+	fprintf(stderr, "No child process %d.\n", pid);
+	return -1;
+}
+
+/*
+ * check for process that have status information available without blocking
+ */
+static void update_status(void) {
+	int status;
+	pid_t pid;
+	
+	do {
+		pid = waitpid(-1, &status, WNOHANG|WUNTRACED);
+	} while(!make_process_status(pid, status));	
+}
+
+/*
+ * check for processes that have status information available
+ * blocking until all process in the given job have all reported
+ */
+static void wait_for_job(job *j) {
+	int status;
+	pid_t pid;
+	
+	do {
+		pid = waitpid(-1, &status, WUNTRACED);
+	} while (!make_process_status(pid, status)
+		&& !job_is_stopped(j)
+		&& !job_is_completed(j));
+}
+
+/* format job status information for the user to look at  */
+static void format_job_info(job *j, const char *status) {
+	fprintf(stderr, "%d (%s): %s\n", j->pgid, status, j->command);
+}
+
+/* notify the user about stopped or terminated jobs  */
+static void do_job_notification(void) {
+	job *j, *jnext;
+	job *jlast;		/* last non-terminated job  */
+	
+	/* update status for child processes  */
+	update_status();
+	
+	/* iterate over the active job list
+	   report stopped or terminated jobs
+	   and free terminated job  */
+	jlast = NULL;
+	for (j=first_job; j; j=j->next) {
+		jnext = j->next;
+		if (job_is_completed(j)) {
+			format_job_info(j, "completed");
+			if (!jlast)
+				first_job = jnext;
+			else
+				jlast->next = jnext;
+			free_job(j);
+		} else if (job_is_stopped(j) && !j->notified) {
+			format_job_info(j, "stopped");
+			j->notified = 1;
+			jlast = j;
+		} else {
+			/* report nothing about running jobs  */
+			jlast = j;
+		}	
+	}
+}
+
+/* mark a stopped job as running again  */
+static void mark_job_as_running(job *j) {
+	process *p;
+	
+	for (p=j->first_process; p; p=p->next) {
+		p->stopped = 0;	
+	}
+	j->notified = 0;
+}
+
+/* continue the job  */
+static void continue_job(job *j, int foreground) {
+	mark_job_as_running(j);
+	if (foreground)
+		put_job_in_foreground(j, 1);
+	else
+		put_job_in_background(j, 1);
+}
+
+static int simpleshell(int argc, char **argv) {
+	fprintf(stderr, "TO BE IMPLEMENTED\n");
+	return 1;	
+}
+
 /* define the function table */
 static struct func_tab functab[NFUNCS] = {
 	{"func_test", func_test},
@@ -918,6 +1275,7 @@ static struct func_tab functab[NFUNCS] = {
 	{"complex_daemon", complex_daemon},
 	{"show_process_info", show_proc_info},
 	{"monitor_and_sync", monitor_and_sync},
+	{"simpleshell", simpleshell},
 	{"tinyinit", tinyinit},
 	{NULL, NULL},
 };
