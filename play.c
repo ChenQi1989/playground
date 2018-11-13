@@ -19,6 +19,7 @@
 #include <libgen.h>
 #include <termios.h>
 #include <sys/wait.h>
+#include <netdb.h>
 
 #include "play.h"
 
@@ -75,6 +76,63 @@ static int test_dirname(int argc, char **argv) {
 		error_and_exit("strdup dirname %s failed: %m\n", path);
 	else
 		printf("base_dir = %s\n", base_dir);
+	return 0;
+}
+
+static void show_hostent(struct hostent *hp) {
+	assert(hp);
+	
+	/* official name of the host  */
+	printf("h_name = %s\n", hp->h_name);
+	/* alternative names of the host  */
+	char **alias;
+	for (alias = hp->h_aliases; *alias; alias++) {
+		if (alias == hp->h_aliases)
+			printf("h_aliases = %s\n", *alias);
+		else
+			printf("          = %s\n", *alias);
+	}
+	/* host address type  */
+	if (hp->h_addrtype == AF_INET)
+		printf("h_addrtype = AFINET\n");
+	else if (hp->h_addrtype == AF_INET6)
+		printf("h_addrtype = AFINET6\n");
+	else
+		printf("h_addrtype = UNKNOWN\n");
+	/* length, in bytes, of each address  */
+	printf("h_length = %d\n", hp->h_length);
+	/* addresses for the host  */
+	char **addr;
+	int i;
+	for (addr = hp->h_addr_list; *addr; addr++) {
+		if (addr == hp->h_addr_list) {
+			printf("h_addr_list = ");
+			for (i = 0; i < hp->h_length; i++)
+				if (i == 0)
+					printf("%u", (unsigned char)(*addr)[i]);
+				else
+					printf(".%u", (unsigned char)(*addr)[i]);
+			printf("\n");
+		} else {
+			printf("            = ");
+			for (i = 0; i < hp->h_length; i++)
+				if (i == 0)
+					printf("%u", (unsigned char)(*addr)[i]);
+				else
+					printf(".%u", (unsigned char)(*addr)[i]);
+			printf("\n");
+		}
+	}
+}
+
+/* test hostname related functions  */
+static int test_hostname(int argc, char **argv) {
+	struct hostent *hp;
+	
+	if (argc < 2)
+		error_and_exit("test_hostname <hostname>\n");
+	hp = gethostbyname(argv[1]);
+	show_hostent(hp);
 	return 0;
 }
 
@@ -1266,6 +1324,7 @@ static int simpleshell(int argc, char **argv) {
 /* define the function table */
 static struct func_tab functab[NFUNCS] = {
 	{"func_test", func_test},
+	{"test_hostname", test_hostname},
 	{"test_mmap", test_mmap},
 	{"test_dirname", test_dirname},
 	{"chroot_and_list", chroot_and_list},
