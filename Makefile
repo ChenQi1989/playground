@@ -1,10 +1,10 @@
-TARGETS = play mydaemon
+TARGETS = play
 ALL: $(TARGETS)
 
 CFLAGS ?= -Wall
 
 play: play.c play.h
-	$(CC) $(CFLAGS) -o play play.c
+	$(CC) $(CFLAGS) -o play play.c -lpam -lpam_misc
 mydaemon: small-talk-daemon-types.c
 	$(CC) $(CFLAGS) -lsystemd -o mydaemon small-talk-daemon-types.c
 

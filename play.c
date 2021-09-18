@@ -20,6 +20,9 @@
 #include <termios.h>
 #include <sys/wait.h>
 #include <netdb.h>
+#include <pwd.h>
+#include <security/pam_appl.h>
+#include <security/pam_misc.h>
 
 #include "play.h"
 
@@ -1321,6 +1324,26 @@ static int simpleshell(int argc, char **argv) {
 	return 1;	
 }
 
+static int mylogin(int argc, char **argv) {
+	const char *MYLOGIN_CONFIG = "mylogin";
+	int result;
+	struct pam_conv conv = { misc_conv, NULL };
+	pam_handle_t *pamh;
+	struct passwd *pw;
+	if ((pw = getpwuid(getuid())) == NULL)
+		error_and_exit("getpwuid failed\n");
+	if ((result = pam_start(MYLOGIN_CONFIG, pw->pw_name, &conv, &pamh)) != PAM_SUCCESS)
+		error_and_exit("pam_start failed\n");
+	if ((result = pam_authenticate(pamh, 0)) != PAM_SUCCESS)
+		error_and_exit("pam_authenticate failed\n");
+	if ((result = pam_acct_mgmt(pamh, 0)) != PAM_SUCCESS)
+		error_and_exit("pam_acct_mgmt failed\n");
+	if ((result = pam_end(pamh, result)) != PAM_SUCCESS)
+		error_and_exit("pam_end failed\n");
+	printf("Going to start shell ...\n");
+	return 0;
+}
+
 /* define the function table */
 static struct func_tab functab[NFUNCS] = {
 	{"func_test", func_test},
@@ -1336,6 +1359,7 @@ static struct func_tab functab[NFUNCS] = {
 	{"monitor_and_sync", monitor_and_sync},
 	{"simpleshell", simpleshell},
 	{"tinyinit", tinyinit},
+	{"mylogin", mylogin},
 	{NULL, NULL},
 };
 
