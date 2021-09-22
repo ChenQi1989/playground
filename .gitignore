@@ -1,5 +1,6 @@
 *~
 *.o
+*.so
 kernel-rootfs/
 temp/
 container-root/
