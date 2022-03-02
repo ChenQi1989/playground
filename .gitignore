@@ -8,3 +8,4 @@ chroot_root/
 play
 debug.strace
 mydaemon
+hello

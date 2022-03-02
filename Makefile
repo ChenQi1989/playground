@@ -1,4 +1,4 @@
-TARGETS = play my_pam_module.so
+TARGETS = play my_pam_module.so hello
 ALL: $(TARGETS)
 
 CFLAGS ?= -Wall
@@ -9,6 +9,8 @@ mydaemon: small-talk-daemon-types.c
 	$(CC) $(CFLAGS) -lsystemd -o mydaemon small-talk-daemon-types.c
 my_pam_module.so: my_pam_module.c
 	$(CC) $(CFLAGS) -fPIC -shared -o my_pam_module.so my_pam_module.c -lpam
+hello: hello.c
+	$(CC) $(CFLAGS) -o hello hello.c
 
 clean:
 	rm -f *~
